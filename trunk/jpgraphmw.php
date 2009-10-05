@@ -25,6 +25,7 @@ require_once("$jpgraph_home/src/jpgraph_line.php");
 require_once("$jpgraph_home/src/jpgraph_bar.php");
 require_once("$jpgraph_home/src/jpgraph_date.php");
 require_once("$jpgraph_home/src/jpgraph_pie.php");
+require_once("$jpgraph_home/src/jpgraph_pie3d.php");
 
 if(! defined( 'MEDIAWIKI' ) ) {
   echo( "This is an extension to the MediaWiki package and cannot be run standalone.\n" );
@@ -43,44 +44,50 @@ $wgExtensionFunctions[] = 'jpChartSetup';
 // -----------------------------------------------------------------------------
 function jpChartSetup() {
   global $wgParser;
-  $wgParser->setHook( 'jplines', 'jpLinesRender' );
-  $wgParser->setHook( 'jpline', 'jpLinesRender' );
-  $wgParser->setHook( 'jpbars', 'jpBarsRender' );
-  $wgParser->setHook( 'jpbar', 'jpBarsRender' );
-  $wgParser->setHook( 'jppie', 'jpPieRender' );
+  $wgParser->setHook('jplines', 'jpLinesRender');
+  $wgParser->setHook('jpline', 'jpLinesRender');
+  $wgParser->setHook('jpbars', 'jpBarsRender');
+  $wgParser->setHook('jpbar', 'jpBarsRender');
+  $wgParser->setHook('jppie', 'jpPieRender');
 }
 
 // Main class
 abstract class JpchartMW {
-  var $fieldsep;
-  var $hasxlabel;
-  var $hasylabel;
-  var $scale;
-  var $dateformat;
-  var $haslegend;
-  var $hasxgrid;
-  var $hasygrid;
-  var $ishorizontal;
   var $size;
+  var $sizex,$sizey;
+  var $margin;
   var $title;
   var $colors;
   var $color_list;
   var $fill;
   var $isstacked;
   var $is3d;
+  var $fieldsep;
+  var $scale;
+  var $dateformat;
+  var $legendposition;
+  var $rotatexlegend;
+  var $rotateylegend;
+  var $hasxlabel;
+  var $hasylabel;
+  var $haslegend;
+  var $hasxgrid;
+  var $hasygrid;
+  var $ishorizontal;
   var $min;
   var $max;
   var $ysteps;
   var $format;
   var $isantialias;
   var $usettf;
-  var $rotatexlegend;
-  var $rotateylegend;
-  var $type;
-  var $margin;
-  var $disable;
-  var $group;
   var $font;
+  var $type;
+  var $disable;
+  // internal
+  var $datay;
+  var $datax;
+  var $labels;
+  var $plot_list;
   // Constructor
   function JpchartMW($args) {
     global $jpgraphWikiDefaults;
@@ -92,6 +99,7 @@ abstract class JpchartMW {
     $this->parseArgs($args);
     $this->preProcess();
   }
+
   // default init value
   function init() {
     $this->fieldsep = ",";
@@ -121,6 +129,11 @@ abstract class JpchartMW {
     $this->type = "default";
     $this->disable = "";
     $this->font = FF_DV_SANSSERIF;
+    // internals
+    $this->datay = array();
+    $this->datax = false;
+    $this->labels = array();
+    $this->plot_list = array();
   }
   // debug function
   function debug($args) {
@@ -134,9 +147,8 @@ abstract class JpchartMW {
   // Parse argument and set the parameters accordingly
   function parseArgs($args) {
     if(is_null($args)) return;
-    $var = "\$this->size";
     foreach( $args as $name => $value ) {
-      if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|title|colors|nocolors|disable|".
+      if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|legendposition|title|colors|nocolors|disable|".
                     "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2];
         eval("$var = (\$field[1] == \"no\" ? \"\" : \$value);");
@@ -183,14 +195,7 @@ abstract class JpchartMW {
     }
 
     list($this->size_x, $this->size_y) = split("x", $this->size);
-    switch($this->type) {
-      case "pie":
-        $this->graph = ($this->is3d ? new PieGraph3D($this->size_x, $this->size_y) : new PieGraph($this->size_x, $this->size_y));
-        break;
-      default:
-        $this->graph = new Graph($this->size_x, $this->size_y);
-        break;
-    }
+    $this->instanciateGraph();
     if($this->title) {
       $this->graph->title->Set($this->title);
       if($this->usettf)
@@ -202,6 +207,7 @@ abstract class JpchartMW {
       $this->graph->SetMargin($lm, $rm, $tm, $bm);
     }
   }
+  abstract function instanciateGraph();
   // part to implement in order to handle bar, line, pie etc.
   abstract function parse($input, $parser);
   // post process
@@ -247,12 +253,10 @@ class JpchartMWLine extends JpchartMW {
   function JpchartMWLine($args) {
     JpchartMW::JpchartMW($args);
   }
+  function instanciateGraph() {
+    $this->graph = new Graph($this->size_x, $this->size_y, "auto");
+  }
   function parse($input, $parser) {
-    $this->datay = array();
-    $this->datax = false;
-    $this->labels = array();
-    $this->plot_list = array();
-
     // retrieving data
     $i = 0;
     $max_row_count = -1;
@@ -316,41 +320,118 @@ class JpchartMWLine extends JpchartMW {
   }
 }
 
+class JpchartMWPie extends JpchartMW {
+  function JpchartMWPie($args) {
+    JpchartMW::JpchartMW($args);
+  }
+  function instanciateGraph() {
+    $this->graph = new PieGraph($this->size_x, $this->size_y);
+  }
+  function parse($input, $parser) {
+    foreach(split("\n", $input) as $line) {
+      // skip empty line or comments
+      if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
+      // Storing data
+      $raw_data = split($this->fieldsep, $line);
+      if(count($raw_data) == 2) {
+        $this->labels[] = $raw_data[0];
+        $this->datay[] = $raw_data[1];
+      } else {
+        $this->datay[] = $raw_data[0];
+      }
+    }
+    $pie = ($this->is3d ? new PiePlot3D($this->datay) : new PiePlot($this->datay));
+    if(count($this->labels) == count($this->datay))
+      $pie->SetLegends($this->labels);
+    $this->graph->Add($pie);
+  }
+}
+
+class JpchartMWBar extends JpchartMW {
+  function JpchartMBar($args) {
+    JpchartMW::JpchartMW($args);
+  }
+  function instanciateGraph() {
+    $this->graph = new Graph($this->size_x, $this->size_y);
+    $this->graph->SetScale("intlin");
+  }
+  function parseGroupBar($input) {
+    $line_count = 0;
+    // retrieving data
+    $this->datay = array();
+    foreach(split("\n", $input) as $line) {
+      // skip empty line or comments
+      if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
+      $line_array = split($this->fieldsep, $line);
+      // Storing data
+      for($i = 0; $i < count($line_array); $i++) {
+        $this->datay[$i][] = $line_array[$i];
+      }
+      $line_count++;
+    }
+    if($line_count == 0) return false;
+    $bar_list = array();
+    // Creating data object
+    for($i = 0; $i < count($this->datay); $i++) {
+      $barplot = new BarPlot($this->datay[$i]);
+      $barplot->SetFillColor($this->color_list[$i % count($this->color_list)]);
+      /*$barplot->SetFillGradient($this->color_list[$i % count($this->color_list)],
+                                  $this->color_list[($i + 1) % count($this->color_list)], GRAD_VERT);*/
+      $bar_list []= $barplot;
+    }
+    if(count($bar_list) == 1) {
+      return $bar_list[0];
+    } else {
+      return new AccBarPlot($bar_list);
+    }
+  }
+  function parse($input, $parser) {
+    $group_bar_data = preg_split("/groupbar:/", $input);
+    $group_list = array();
+    foreach($group_bar_data as $group_bar) {
+      if($result = $this->parseGroupBar($group_bar))
+        $group_list []= $result;
+    }
+    if(count($group_list) == 1) {
+      $this->graph->Add($group_list[0]);
+    } else {
+      $this->graph->Add(new GroupBarPlot($group_list));
+    }
+  }
+}
+
 // -----------------------------------------------------------------------------
-function jpLinesRender( $input, $args, $parser ) {
+function jpLinesRender($input, $args, $parser) {
   try {
-    $jpline = new JpchartMWLine($args);
-    $jpline->parse($input, $parser);
-    $jpline->postProcess();
-    return $jpline->finalize($input, $args);
+    $jpchart = new JpchartMWLine($args);
+    $jpchart->parse($input, $parser);
+    $jpchart->postProcess();
+    return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
     return "<pre>".$e->getMessage()."</pre>";
   }
 }
 
-function jpBarsRender( $input, $args, $parser ) {
-  global $jpgraphWikiDefaults;
-  global $jpgraphBarsDefaults;
-
-  /* jpChartInit();
-  jpArgsParseCommon($jpgraphWikiDefaults);
-  jpArgsParseCommon($jpgraphBarsDefaults);
-  jpArgsParseCommon($args);
-  jpApplySettings();*/
-
-  return "Render bar graphic($input)";
+function jpBarsRender($input, $args, $parser) {
+  try {
+    $jpchart = new JpchartMWBar($args);
+    $jpchart->parse($input, $parser);
+    $jpchart->postProcess();
+    return $jpchart->finalize($input, $args);
+  } catch(Exception $e) {
+    return "<pre>".$e->getMessage()."</pre>";
+  }
 }
 
-function jpPieRender( $input, $args, $parser ) {
-  global $jpgraphWikiDefaults;
-  global $jpgraphPieDefaults;
-
-  /* jpChartInit();
-  jpArgsParseCommon($jpgraphWikiDefaults);
-  jpArgsParseCommon($jpgraphPieDefaults);
-  jpArgsParseCommon($args);
-  jpApplySettings();*/
-
-  return "Render pie graphic($input)";
+function jpPieRender($input, $args, $parser) {
+  try {
+    $jpchart = new JpchartMWPie($args);
+    $jpchart->parse($input, $parser);
+    $jpchart->postProcess();
+    return $jpchart->finalize($input, $args);
+  } catch(Exception $e) {
+    return "<pre>".$e->getMessage()."</pre>";
+  }
 }
+
 ?>
