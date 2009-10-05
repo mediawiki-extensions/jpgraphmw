@@ -17,7 +17,7 @@
  * Mostly inspirade by gchart4mw
  */
 
-error_reporting (E_ALL);
+error_reporting(E_ALL);
 $jpgraph_home = "$IP/extensions/jpgraph";
 
 require_once("$jpgraph_home/src/jpgraph.php");
@@ -49,350 +49,282 @@ function jpChartSetup() {
   $wgParser->setHook( 'jpbar', 'jpBarsRender' );
   $wgParser->setHook( 'jppie', 'jpPieRender' );
 }
-          
-// -----------------------------------------------------------------------------
-function jpChartInit() {
-  global $fieldsep;
-  global $hasxlabel;
-  global $hasylabel;
-  global $scale;
-  global $dateformat;
-  global $haslegend;
-  global $hasxgrid;
-  global $hasygrid;
-  global $ishorizontal;
-  global $size;
-  global $title;
-  global $colors;
-  global $fill;
-  global $isstacked;
-  global $is3d;
-  global $min;
-  global $max;
-  global $ysteps;
-  global $format;
-  global $isantialias;
-  global $usettf;
-  global $rotatexlegend;
-  global $rotateylegend;
-  global $type;
-  global $margin;
-  global $disable;
-  global $group;
-  global $font;
 
-  $fieldsep = ",";
-  $hasxlabel = false;
-  $hasylabel = false;
-  $scale = false;
-  $dateformat = false;
-  $haslegend = false;
-  $hasxgrid = false;
-  $hasygrid = false;
-  $ishorizontal = false;
-  $isantialias = true;   // set to false if you don't have antialias support in GD
-  $usettf = true;        // set to false if you don't have ttf support in GD
-  $rotatexlegend = 0;
-  $rotateylegend = 0;
-  $size = "400x300";
-  $margin = "60,20,50,80";
-  $title = "";
-  $colors = "#5555ff,#ff5555,#55ff55,#ff55ff,#A0F000,#ffff55,#956575,#55ffff,#ff00ff,#7f7f00,#A07fA0,#7f7f7f,#7f007f";
-  $fill = "";
-  $isstacked = false;
-  $is3d = false;
-  $min = 0;
-  $max = false;
-  $ysteps = 2;
-  $format = "png";
-  $type = "default";
-  $disable = "";
-  $font = FF_DV_SANSSERIF;
-}
+// Main class
+abstract class JpchartMW {
+  var $fieldsep;
+  var $hasxlabel;
+  var $hasylabel;
+  var $scale;
+  var $dateformat;
+  var $haslegend;
+  var $hasxgrid;
+  var $hasygrid;
+  var $ishorizontal;
+  var $size;
+  var $title;
+  var $colors;
+  var $color_list;
+  var $fill;
+  var $isstacked;
+  var $is3d;
+  var $min;
+  var $max;
+  var $ysteps;
+  var $format;
+  var $isantialias;
+  var $usettf;
+  var $rotatexlegend;
+  var $rotateylegend;
+  var $type;
+  var $margin;
+  var $disable;
+  var $group;
+  var $font;
+  // Constructor
+  function JpchartMW($args) {
+    global $jpgraphWikiDefaults;
+    global $jpgraphLinesDefaults;
 
-// -----------------------------------------------------------------------------
-function jpArgsDebug ( $args ) {
-  $attr = array();    
-  // make a list of attributes and their values and dump them, along with the user input
-  foreach( $args as $name => $value )
-    $attr[] = '<strong>' . htmlspecialchars( $name ) . '</strong> = ' . htmlspecialchars( $value );
-  $rslt = implode( '<br />', $attr ) . "<br />";
-
-  return $rslt;
-}
-
-// -----------------------------------------------------------------------------
-function jpArgsParseCommon ( $args ) {
-  if (is_null($args)) return;
-
-  foreach( $args as $name => $value ) {
-    if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|title|colors|nocolors|disable|".
-                  "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
-      global $$field[2];
-      $$field[2] = ($field[1] == "no" ? "" : $value);
-    } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
-      $var = "has".$field[2];
-      global $$var;
-      $$var = ($field[1] != "no");
-    } else if(preg_match("/^(no|not)?(horizontal|antialias|stacked|3d)$/", $name, $field)) {
-      $var = "is".$field[2];
-      global $$var;
-      $$var = (!preg_match("/^(no|not)$/", $field[1]));
-    } else switch ($name) {
-      case "grid":
-        switch ($value) {
-          case "xy":
-            $hasxgrid=true;
-            $hasygrid=true;
-            break;
-          case "yx":
-            $hasxgrid=true;
-            $hasygrid=true;
-            break;
-          case "x":
-            $hasxgrid=true;
-            $hasygrid=false;
-            break;
-          case "y":
-            $hasxgrid=false;
-            $hasygrid=true;
-            break;
-        }
-        break;
-      case "nogrid":
-        $hasxgrid=false;
-        $hasygrid=false;
-        break;
-    }
+    $this->init();
+    $this->parseArgs($jpgraphWikiDefaults);
+    $this->parseArgs($jpgraphLinesDefaults);
+    $this->parseArgs($args);
+    $this->preProcess();
   }
-}
-
-// -----------------------------------------------------------------------------
-function jpApplySettings () {
-  global $graph;
-  global $type;
-  global $hasxlabel;
-  global $hasylabel;
-  global $dateformat;
-  global $haslegend;
-  global $hasxgrid;
-  global $hasygrid;
-  global $ishorizontal;
-  global $size;
-  global $margin;
-  global $title;
-  global $colors;
-  global $fill;
-  global $isstacked;
-  global $is3d;
-  global $min;
-  global $max;
-  global $ysteps;
-  global $color_list;
-  global $isantialias;
-  global $usettf;
-  global $font;
-
-  $color_list = split(",", $colors);
-  for($i = 0; $i < count($color_list); $i++) {
-    // add a '#' if the user use an hexa color
-    if(preg_match("/[a-fA-F0-9]{6}/", $color_list[$i]))
-      $color_list[$i] = "#".$color_list[$i];
+  // default init value
+  function init() {
+    $this->fieldsep = ",";
+    $this->hasxlabel = false;
+    $this->hasylabel = false;
+    $this->scale = false;
+    $this->dateformat = false;
+    $this->haslegend = false;
+    $this->hasxgrid = false;
+    $this->hasygrid = false;
+    $this->ishorizontal = false;
+    $this->isantialias = true;   // set to false if you don't have antialias support in GD
+    $this->usettf = true;        // set to false if you don't have ttf support in GD
+    $this->rotatexlegend = 0;
+    $this->rotateylegend = 0;
+    $this->size = "400x300";
+    $this->margin = "60,20,50,80";
+    $this->title = "";
+    $this->colors = "#5555ff,#ff5555,#55ff55,#ff55ff,#A0F000,#ffff55,#956575,#55ffff,#ff00ff,#7f7f00,#A07fA0,#7f7f7f,#7f007f";
+    $this->fill = "";
+    $this->isstacked = false;
+    $this->is3d = false;
+    $this->min = 0;
+    $this->max = false;
+    $this->ysteps = 2;
+    $this->format = "png";
+    $this->type = "default";
+    $this->disable = "";
+    $this->font = FF_DV_SANSSERIF;
   }
-
-  list($size_x, $size_y) = split("x", $size);
-  switch ($type) {
-    case "pie":
-      $graph = ($is3d ? new PieGraph3D($size_x, $size_y) : new PieGraph($size_x, $size_y));
-      break;
-    default:
-      $graph = new Graph($size_x, $size_y);
-      break;
+  // debug function
+  function debug($args) {
+    $attr = array();    
+    // make a list of attributes and their values and dump them, along with the user input
+    foreach($args as $name => $value)
+      $attr[] = '<strong>' . htmlspecialchars( $name ) . '</strong> = ' . htmlspecialchars( $value );
+    $rslt = implode( '<br />', $attr ) . "<br />";
+    return $rslt;
   }
-  if($title) {
-    $graph->title->Set($title);
-    if($usettf)
-      $graph->title->SetFont($font, FS_BOLD, 12);
-  }
-  $graph->img->SetAntiAliasing($isantialias);
-  if($margin) {
-    list($lm, $rm, $tm, $bm) = split(",", $margin);
-    $graph->SetMargin($lm, $rm, $tm, $bm);
-  }
-}
-
-function jpLinesParse( $input, $parser ) {
-  global $fieldsep;
-  global $graph;
-  global $color_list;
-  global $scale;
-  global $dateformat;
-  global $min;
-  global $max;
-  global $isstacked;
-  global $disable;
-  global $type;
-  global $group;
-
-  $datay = array();
-  $datax = false;
-  $labels = array();
-  $plot_list = array();
-
-  // retrieving data
-  $i = 0;
-  $max_row_count = -1;
-  foreach(split("\n", $input) as $line) {
-    // skip empty line or comments
-    if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
-    $line_array = split($fieldsep, $line);
-    // if first loop => setting label and continue with next loop
-    if($i == 0) {
-      $labels = $line_array;
-      $i++; continue;
-    }
-    // Storing data
-    for($j = 0; $j < count($line_array); $j++) {
-      $datay[$j][] = $line_array[$j];
-    }
-    // check data integrity
-    if($max_row_count == -1)
-      $max_row_count = count($line_array);
-    if($max_row_count != count($line_array)) {
-      throw new Exception("Error while parsing '".implode($fieldsep, $line_array)."' : bad number of row.");
-    }
-    $i++;
-  }
-  // if (x, y) curve => set datax with first set of datay
-  if($scale) {
-    $datax = $datay[0];
-    $data_start = 1;
-    if($scale == "xy") {
-      $dateformat = "U";
-    } else {
-      for($i = 0; $i < count($datax); $i++) {
-        $datax[$i] = strtotime($datax[$i]);
+  // Parse argument and set the parameters accordingly
+  function parseArgs($args) {
+    if(is_null($args)) return;
+    $var = "\$this->size";
+    foreach( $args as $name => $value ) {
+      if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|title|colors|nocolors|disable|".
+                    "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+        $var = "\$this->".$field[2];
+        eval("$var = (\$field[1] == \"no\" ? \"\" : \$value);");
+      } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
+        $var = '$this->has'.$field[2];
+        eval("$var = (\$field[1] != 'no');");
+      } else if(preg_match("/^(no|not)?(horizontal|antialias|stacked|3d)$/", $name, $field)) {
+        $var = '$this->is'.$field[2];
+        eval("$var = (!preg_match(\"/^(no|not)$/\", \$field[1]));");
+      } else switch($name) {
+        case "grid":
+          switch($value) {
+            case "xy":
+              $this->hasxgrid=true;
+              $this->hasygrid=true;
+              break;
+            case "yx":
+              $this->hasxgrid=true;
+              $this->hasygrid=true;
+              break;
+            case "x":
+              $this->hasxgrid=true;
+              $this->hasygrid=false;
+              break;
+            case "y":
+              $this->hasxgrid=false;
+              $this->hasygrid=true;
+              break;
+          }
+          break;
+        case "nogrid":
+          $this->hasxgrid=false;
+          $this->hasygrid=false;
+          break;
       }
     }
-  } else {
-    $data_start = 0;
   }
+  function preProcess() {
+    $this->color_list = split(",", $this->colors);
+    for($i = 0; $i < count($this->color_list); $i++) {
+      // add a '#' if the user use an hexa color
+      if(preg_match("/[a-fA-F0-9]{6}/", $this->color_list[$i]))
+        $this->color_list[$i] = "#".$this->color_list[$i];
+    }
 
-  $disable_row = split(",", "-1,".$disable);
-  // Creating data object
-  for($i = $data_start; $i < count($datay); $i++) {
-    if(array_search($i, $disable_row)) continue;
-    // Creating object
-    switch ($type) {
-      case "bar":
-        $lineplot = new BarPlot($datay[$i]);
+    list($this->size_x, $this->size_y) = split("x", $this->size);
+    switch($this->type) {
+      case "pie":
+        $this->graph = ($this->is3d ? new PieGraph3D($this->size_x, $this->size_y) : new PieGraph($this->size_x, $this->size_y));
         break;
       default:
-        $lineplot = new LinePlot($datay[$i], $datax);
-        $lineplot->mark->SetType(MARK_FILLEDCIRCLE);
-        $lineplot->mark->SetFillColor($color_list[$i % count($color_list)]);
+        $this->graph = new Graph($this->size_x, $this->size_y);
         break;
     }
-    $lineplot->SetLegend($labels[$i]);
-    if($isstacked) {
-      $plot_list []= $lineplot;
-      $lineplot->SetColor("gray");
-      $lineplot->SetFillColor($color_list[$i % count($color_list)]);
-    } else {
-      $lineplot->SetColor($color_list[$i % count($color_list)]);
-      $graph->Add($lineplot);
+    if($this->title) {
+      $this->graph->title->Set($this->title);
+      if($this->usettf)
+        $this->graph->title->SetFont($this->font, FS_BOLD, 12);
+    }
+    $this->graph->img->SetAntiAliasing($this->isantialias);
+    if($this->margin) {
+      list($lm, $rm, $tm, $bm) = split(",", $this->margin);
+      $this->graph->SetMargin($lm, $rm, $tm, $bm);
     }
   }
-  if($isstacked) {
-    $point_area = new AccLinePlot($plot_list);
-    $graph->Add($point_area);
+  // part to implement in order to handle bar, line, pie etc.
+  abstract function parse($input, $parser);
+  // post process
+  function postProcess() {
+    $this->color_list = split(",", $this->colors);
+
+    if($this->hasxgrid)
+      $this->graph->xgrid->Show();
+    if($this->hasygrid)
+      $this->graph->ygrid->Show();
+    if($this->scale) {
+      $this->graph->SetScale("datlin");
+    } else {
+      $this->graph->SetScale("textlin");
+    }
+    $this->graph->ygrid->SetFill(true, '#EFEFEF@0.5', '#BBCCFF@0.5');
+    if($this->dateformat)
+      $this->graph->xaxis->scale->SetDateFormat($this->dateformat);
+
+    if($this->usettf) {
+      $this->graph->xaxis->SetFont($this->font);
+      $this->graph->yaxis->SetFont($this->font);
+      $this->graph->xaxis->SetLabelAngle($this->rotatexlegend);
+      $this->graph->yaxis->SetLabelAngle($this->rotateylegend);
+    }
+
+    $this->graph->yaxis->scale->SetAutoMin($this->min);
+    $this->graph->yaxis->scale->SetAutoMax($this->max);
+  }
+  // render and send back img tag
+  function finalize($input, $args) {
+    global $wgUploadDirectory;
+    global $wgUploadPath;
+
+    // Generating image
+    $img_name = md5(implode("", $args).$input).$this->format;
+    $this->graph->Stroke("$wgUploadDirectory/$img_name");
+    return '<p><b><img src="'.$wgUploadPath."/".$img_name."\" alt=\"".$this->title."\"></b></p>";
   }
 }
 
-// -----------------------------------------------------------------------------
-function jpPostProcess () {
-  global $graph;
-  global $hasxlabel;
-  global $hasylabel;
-  global $scale;
-  global $dateformat;
-  global $haslegend;
-  global $hasxgrid;
-  global $hasygrid;
-  global $ishorizontal;
-  global $size;
-  global $title;
-  global $colors;
-  global $fill;
-  global $isstacked;
-  global $is3d;
-  global $min;
-  global $max;
-  global $ysteps;
-  global $color_list;
-  global $rotatexlegend;
-  global $rotateylegend;
-  global $usettf;
-  global $font;
-
-  $color_list = split(",", $colors);
-
-  if($hasxgrid)
-    $graph->xgrid->Show();
-  if($hasygrid)
-    $graph->ygrid->Show();
-  if($scale) {
-    $graph->SetScale("datlin");
-  } else {
-    $graph->SetScale("textlin");
+class JpchartMWLine extends JpchartMW {
+  function JpchartMWLine($args) {
+    JpchartMW::JpchartMW($args);
   }
-  $graph->ygrid->SetFill(true, '#EFEFEF@0.5', '#BBCCFF@0.5');
-  if($dateformat)
-    $graph->xaxis->scale->SetDateFormat($dateformat);
+  function parse($input, $parser) {
+    $this->datay = array();
+    $this->datax = false;
+    $this->labels = array();
+    $this->plot_list = array();
 
-  if($usettf) {
-    $graph->xaxis->SetFont($font);
-    $graph->yaxis->SetFont($font);
-    $graph->xaxis->SetLabelAngle($rotatexlegend);
-    $graph->yaxis->SetLabelAngle($rotateylegend);
+    // retrieving data
+    $i = 0;
+    $max_row_count = -1;
+    foreach(split("\n", $input) as $line) {
+      // skip empty line or comments
+      if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
+      $line_array = split($this->fieldsep, $line);
+      // if first loop => setting label and continue with next loop
+      if($i == 0) {
+        $this->labels = $line_array;
+        $i++; continue;
+      }
+      // Storing data
+      for($j = 0; $j < count($line_array); $j++) {
+        $this->datay[$j][] = $line_array[$j];
+      }
+      // check data integrity
+      if($max_row_count == -1)
+        $max_row_count = count($line_array);
+      if($max_row_count != count($line_array)) {
+        throw new Exception("Error while parsing '".implode($fieldsep, $line_array)."' : bad number of row.");
+      }
+      $i++;
+    }
+    // if(x, y) curve => set datax with first set of datay
+    if($this->scale) {
+      $this->datax = $this->datay[0];
+      $data_start = 1;
+      if($this->scale == "xy") {
+        $this->dateformat = "U";
+      } else {
+        for($i = 0; $i < count($this->datax); $i++) {
+          $this->datax[$i] = strtotime($this->datax[$i]);
+        }
+      }
+    } else {
+      $data_start = 0;
+    }
+
+    $disable_row = split(",", "-1,".$this->disable);
+    // Creating data object
+    for($i = $data_start; $i < count($this->datay); $i++) {
+      if(array_search($i, $disable_row)) continue;
+      $lineplot = new LinePlot($this->datay[$i], $this->datax);
+      $lineplot->mark->SetType(MARK_FILLEDCIRCLE);
+      $lineplot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
+      $lineplot->SetLegend($this->labels[$i]);
+      if($this->isstacked) {
+        $plot_list []= $lineplot;
+        $lineplot->SetColor("gray");
+        $lineplot->SetFillColor($this->color_list[$i % count($this->color_list)]);
+      } else {
+        $lineplot->SetColor($this->color_list[$i % count($this->color_list)]);
+        $this->graph->Add($lineplot);
+      }
+    }
+    if($this->isstacked) {
+      $point_area = new AccLinePlot($plot_list);
+      $this->graph->Add($point_area);
+    }
   }
-
-  $graph->yaxis->scale->SetAutoMin($min);
-  $graph->yaxis->scale->SetAutoMax($max);
-}
-
-// -----------------------------------------------------------------------------
-function jpFinalizeGraph( $input, $args ) {
-  global $wgUploadDirectory;
-  global $wgUploadPath;
-  global $graph;
-  global $format;
-  global $title;
-
-  // Generating image
-  $img_name = md5(implode("", $args).$input).".$format";
-  $graph->Stroke("$wgUploadDirectory/$img_name");
-  return '<p><b><img src="'.$wgUploadPath."/".$img_name."\" alt=\"$title\"></b></p>";
 }
 
 // -----------------------------------------------------------------------------
 function jpLinesRender( $input, $args, $parser ) {
-  global $jpgraphWikiDefaults;
-  global $jpgraphLinesDefaults;
-
   try {
-    jpChartInit ();
-    jpArgsParseCommon ($jpgraphWikiDefaults);
-    jpArgsParseCommon ($jpgraphLinesDefaults);
-    jpArgsParseCommon ($args);
-    jpApplySettings ();
-
-    jpLinesParse($input, $parser);
-    jpPostProcess();
-
-    return jpFinalizeGraph($input, $args);
+    $jpline = new JpchartMWLine($args);
+    $jpline->parse($input, $parser);
+    $jpline->postProcess();
+    return $jpline->finalize($input, $args);
   } catch(Exception $e) {
-    return "<pre>".$e->getMessage()."\n".$e->getTraceAsString()."</pre>";
+    return "<pre>".$e->getMessage()."</pre>";
   }
 }
 
@@ -400,11 +332,11 @@ function jpBarsRender( $input, $args, $parser ) {
   global $jpgraphWikiDefaults;
   global $jpgraphBarsDefaults;
 
-  jpChartInit ();
-  jpArgsParseCommon ($jpgraphWikiDefaults);
-  jpArgsParseCommon ($jpgraphBarsDefaults);
-  jpArgsParseCommon ($args);
-  jpApplySettings ();
+  /* jpChartInit();
+  jpArgsParseCommon($jpgraphWikiDefaults);
+  jpArgsParseCommon($jpgraphBarsDefaults);
+  jpArgsParseCommon($args);
+  jpApplySettings();*/
 
   return "Render bar graphic($input)";
 }
@@ -413,11 +345,11 @@ function jpPieRender( $input, $args, $parser ) {
   global $jpgraphWikiDefaults;
   global $jpgraphPieDefaults;
 
-  jpChartInit ();
-  jpArgsParseCommon ($jpgraphWikiDefaults);
-  jpArgsParseCommon ($jpgraphPieDefaults);
-  jpArgsParseCommon ($args);
-  jpApplySettings ();
+  /* jpChartInit();
+  jpArgsParseCommon($jpgraphWikiDefaults);
+  jpArgsParseCommon($jpgraphPieDefaults);
+  jpArgsParseCommon($args);
+  jpApplySettings();*/
 
   return "Render pie graphic($input)";
 }
