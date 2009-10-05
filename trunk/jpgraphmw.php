@@ -22,6 +22,7 @@ $jpgraph_home = "$IP/extensions/jpgraph";
 
 require_once("$jpgraph_home/src/jpgraph.php");
 require_once("$jpgraph_home/src/jpgraph_line.php");
+require_once("$jpgraph_home/src/jpgraph_bar.php");
 require_once("$jpgraph_home/src/jpgraph_date.php");
 require_once("$jpgraph_home/src/jpgraph_pie.php");
 
@@ -71,10 +72,14 @@ function jpChartInit() {
   global $ysteps;
   global $format;
   global $isantialias;
+  global $usettf;
   global $rotatexlegend;
   global $rotateylegend;
   global $type;
   global $margin;
+  global $disable;
+  global $group;
+  global $font;
 
   $fieldsep = ",";
   $hasxlabel = false;
@@ -85,7 +90,8 @@ function jpChartInit() {
   $hasxgrid = false;
   $hasygrid = false;
   $ishorizontal = false;
-  $isantialias = true;
+  $isantialias = true;   // set to false if you don't have antialias support in GD
+  $usettf = true;        // set to false if you don't have ttf support in GD
   $rotatexlegend = 0;
   $rotateylegend = 0;
   $size = "400x300";
@@ -100,6 +106,8 @@ function jpChartInit() {
   $ysteps = 2;
   $format = "png";
   $type = "default";
+  $disable = "";
+  $font = FF_DV_SANSSERIF;
 }
 
 // -----------------------------------------------------------------------------
@@ -118,8 +126,8 @@ function jpArgsParseCommon ( $args ) {
   if (is_null($args)) return;
 
   foreach( $args as $name => $value ) {
-    if(preg_match("/^(no)?(size|rotatexlegend|rotateylegend|title|colors|nocolors|".
-                  "margin|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+    if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|title|colors|nocolors|disable|".
+                  "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
       global $$field[2];
       $$field[2] = ($field[1] == "no" ? "" : $value);
     } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
@@ -182,8 +190,15 @@ function jpApplySettings () {
   global $ysteps;
   global $color_list;
   global $isantialias;
+  global $usettf;
+  global $font;
 
   $color_list = split(",", $colors);
+  for($i = 0; $i < count($color_list); $i++) {
+    // add a '#' if the user use an hexa color
+    if(preg_match("/[a-fA-F0-9]{6}/", $color_list[$i]))
+      $color_list[$i] = "#".$color_list[$i];
+  }
 
   list($size_x, $size_y) = split("x", $size);
   switch ($type) {
@@ -196,7 +211,8 @@ function jpApplySettings () {
   }
   if($title) {
     $graph->title->Set($title);
-    $graph->title->SetFont(FF_DV_SANSSERIF, FS_BOLD, 12);
+    if($usettf)
+      $graph->title->SetFont($font, FS_BOLD, 12);
   }
   $graph->img->SetAntiAliasing($isantialias);
   if($margin) {
@@ -214,18 +230,21 @@ function jpLinesParse( $input, $parser ) {
   global $min;
   global $max;
   global $isstacked;
+  global $disable;
+  global $type;
+  global $group;
 
   $datay = array();
   $datax = false;
   $labels = array();
-  $plot_area_list = array();
+  $plot_list = array();
 
   // retrieving data
   $i = 0;
   $max_row_count = -1;
   foreach(split("\n", $input) as $line) {
     // skip empty line or comments
-    if(strlen($line) == 0 || preg_match("/^(\s*)#/", $line)) continue;
+    if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
     $line_array = split($fieldsep, $line);
     // if first loop => setting label and continue with next loop
     if($i == 0) {
@@ -240,7 +259,7 @@ function jpLinesParse( $input, $parser ) {
     if($max_row_count == -1)
       $max_row_count = count($line_array);
     if($max_row_count != count($line_array)) {
-      throw new Exception("Problem while parsing data");
+      throw new Exception("Error while parsing '".implode($fieldsep, $line_array)."' : bad number of row.");
     }
     $i++;
   }
@@ -250,23 +269,33 @@ function jpLinesParse( $input, $parser ) {
     $data_start = 1;
     if($scale == "xy") {
       $dateformat = "U";
-    }
-    for($i = 1; $i < count($datax); $i++) {
-      if(!is_integer($datax[$i]))
+    } else {
+      for($i = 0; $i < count($datax); $i++) {
         $datax[$i] = strtotime($datax[$i]);
+      }
     }
   } else {
     $data_start = 0;
   }
 
+  $disable_row = split(",", "-1,".$disable);
   // Creating data object
   for($i = $data_start; $i < count($datay); $i++) {
-    $lineplot = new LinePlot($datay[$i], $datax);
+    if(array_search($i, $disable_row)) continue;
+    // Creating object
+    switch ($type) {
+      case "bar":
+        $lineplot = new BarPlot($datay[$i]);
+        break;
+      default:
+        $lineplot = new LinePlot($datay[$i], $datax);
+        $lineplot->mark->SetType(MARK_FILLEDCIRCLE);
+        $lineplot->mark->SetFillColor($color_list[$i % count($color_list)]);
+        break;
+    }
     $lineplot->SetLegend($labels[$i]);
-    $lineplot->mark->SetType(MARK_FILLEDCIRCLE);
-    $lineplot->mark->SetFillColor($color_list[$i % count($color_list)]);
     if($isstacked) {
-      $plot_area_list []= $lineplot;
+      $plot_list []= $lineplot;
       $lineplot->SetColor("gray");
       $lineplot->SetFillColor($color_list[$i % count($color_list)]);
     } else {
@@ -275,7 +304,7 @@ function jpLinesParse( $input, $parser ) {
     }
   }
   if($isstacked) {
-    $point_area = new AccLinePlot($plot_area_list);
+    $point_area = new AccLinePlot($plot_list);
     $graph->Add($point_area);
   }
 }
@@ -303,6 +332,8 @@ function jpPostProcess () {
   global $color_list;
   global $rotatexlegend;
   global $rotateylegend;
+  global $usettf;
+  global $font;
 
   $color_list = split(",", $colors);
 
@@ -319,11 +350,13 @@ function jpPostProcess () {
   if($dateformat)
     $graph->xaxis->scale->SetDateFormat($dateformat);
 
-  $graph->xaxis->SetFont(FF_DV_SANSSERIF);
-  $graph->yaxis->SetFont(FF_DV_SANSSERIF);
+  if($usettf) {
+    $graph->xaxis->SetFont($font);
+    $graph->yaxis->SetFont($font);
+    $graph->xaxis->SetLabelAngle($rotatexlegend);
+    $graph->yaxis->SetLabelAngle($rotateylegend);
+  }
 
-  $graph->xaxis->SetLabelAngle($rotatexlegend);
-  $graph->yaxis->SetLabelAngle($rotateylegend);
   $graph->yaxis->scale->SetAutoMin($min);
   $graph->yaxis->scale->SetAutoMax($max);
 }
@@ -388,3 +421,4 @@ function jpPieRender( $input, $args, $parser ) {
 
   return "Render pie graphic($input)";
 }
+?>
