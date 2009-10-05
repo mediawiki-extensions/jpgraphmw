@@ -1,12 +1,16 @@
 #labels exemple,install
 To install this plugin, you need to retrieve two things :
-* jpgraphmw.php from trunk (svn checkout http://jpgraphmw.googlecode.com/svn/trunk/ jpgraphmw)
-* a fresh copy of jpgraph (http://www.aditus.nu/jpgraph/)
+
+- jpgraphmw.php from trunk (svn checkout http://jpgraphmw.googlecode.com/svn/trunk/ jpgraphmw)
+
+- a fresh copy of jpgraph (http://www.aditus.nu/jpgraph/)
 
 Put jpgraphmw.php into extension directory of mediawiki (/var/www/wiki/extensions/), create a sub directory for jpgraph (/var/www/wiki/extensions/jpgraph) and extract the jpgraph archive onto it.
 
 After that, edit LocalSettings.php (/var/www/wiki/) and add the following line somewhere at the end of the file :
- require_once("$IP/extensions/jpgraph.php");
+<pre>
+require_once("$IP/extensions/jpgraph.php");
+</pre>
 
 Now, everything are in place, you can try to use it. Here is some basic exemples :
 
