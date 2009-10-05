@@ -1,7 +1,7 @@
 #labels exemple,install
 To install this plugin, you need to retrieve two things :
-- jpgraphmw.php from trunk (svn checkout http://jpgraphmw.googlecode.com/svn/trunk/ jpgraphmw)
-- a fresh copy of jpgraph (http://www.aditus.nu/jpgraph/)
+* jpgraphmw.php from trunk (svn checkout http://jpgraphmw.googlecode.com/svn/trunk/ jpgraphmw)
+* a fresh copy of jpgraph (http://www.aditus.nu/jpgraph/)
 
 Put jpgraphmw.php into extension directory of mediawiki (/var/www/wiki/extensions/), create a sub directory for jpgraph (/var/www/wiki/extensions/jpgraph) and extract the jpgraph archive onto it.
 
