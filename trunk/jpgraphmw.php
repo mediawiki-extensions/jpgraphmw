@@ -51,7 +51,38 @@ function jpChartSetup() {
   $wgParser->setHook('jppie', 'jpPieRender');
 }
 
-$jpgraphFontList = array("Ahron" => FF_AHRON,
+$jpgraphMarkList = array(
+"Square" => MARK_SQUARE,
+"Utriangle" => MARK_UTRIANGLE,
+"Dtriangle" => MARK_DTRIANGLE,
+"Diamond" => MARK_DIAMOND,
+"Circle" => MARK_CIRCLE,
+"Filledcircle" => MARK_FILLEDCIRCLE,
+"Cross" => MARK_CROSS,
+"Star" => MARK_STAR,
+"X" => MARK_X,
+"Lefttriangle" => MARK_LEFTTRIANGLE,
+"Righttriangle" => MARK_RIGHTTRIANGLE/*,
+"Flash" => MARK_FLASH,
+"Img" => MARK_IMG,
+"Flag1" => MARK_FLAG1,
+"Flag2" => MARK_FLAG2,
+"Flag3" => MARK_FLAG3,
+"Flag4" => MARK_FLAG4,
+"Img_pushpin" => MARK_IMG_PUSHPIN,
+"Img_spushpin" => MARK_IMG_SPUSHPIN,
+"Img_lpushpin" => MARK_IMG_LPUSHPIN,
+"Img_diamond" => MARK_IMG_DIAMOND,
+"Img_square" => MARK_IMG_SQUARE,
+"Img_star" => MARK_IMG_STAR,
+"Img_ball" => MARK_IMG_BALL,
+"Img_sball" => MARK_IMG_SBALL,
+"Img_mball" => MARK_IMG_MBALL,
+"Img_lball" => MARK_IMG_LBALL,
+"Img_bevel" => MARK_IMG_BEVEL*/);
+
+$jpgraphFontList = array(
+"Ahron" => FF_AHRON,
 "Arial" => FF_ARIAL,
 "Big5" => FF_BIG5,
 "Calculator" => FF_CALCULATOR,
@@ -98,6 +129,7 @@ abstract class JpchartMW {
   var $fill;
   var $isstacked;
   var $is3d;
+  var $angle;
   var $fieldsep;
   var $scale;
   var $dateformat;
@@ -117,6 +149,7 @@ abstract class JpchartMW {
   var $isantialias;
   var $usettf;
   var $font;
+  var $mark;
   var $type;
   var $disable;
   // internal
@@ -158,6 +191,7 @@ abstract class JpchartMW {
     $this->fill = "";
     $this->isstacked = false;
     $this->is3d = false;
+    $this->angle = 50;
     $this->min = 0;
     $this->max = false;
     $this->ysteps = 2;
@@ -165,6 +199,7 @@ abstract class JpchartMW {
     $this->type = "default";
     $this->disable = "";
     $this->font = FF_DV_SANSSERIF;
+    $this->mark = MARK_FILLEDCIRCLE;
     // internals
     $this->datay = array();
     $this->datax = false;
@@ -183,14 +218,15 @@ abstract class JpchartMW {
   // Parse argument and set the parameters accordingly
   function parseArgs($args) {
     global $jpgraphFontList;
+    global $jpgraphMarkList;
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "margin|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match("/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                              "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                              "margin|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
@@ -202,10 +238,15 @@ abstract class JpchartMW {
       } else if(preg_match("/^(horizontal|antialias|stacked|3d)$/", $name, $field)) {
         $var = '$this->is'.$field[1];
         eval("$var = (!preg_match(\"/^(no|not)$/\", \$value));");
-      } else if(preg_match("/font/", $name)) {
+      } else if($name == "font") {
         $this->font = $jpgraphFontList[$value];
         if(!$this->font) {
-          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_values($jpgraphFont)));
+          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_values($jpgraphFontList)));
+        }
+      } else if($name == "linemark") {
+        $this->mark = $jpgraphMarkList[$value];
+        if(!$this->mark) {
+          throw new Exception("Unknown mark type($value). Possible values are: ".implode(", ", array_values($jpgraphMarkList)));
         }
       } else switch($name) {
         case "grid":
@@ -282,6 +323,11 @@ abstract class JpchartMW {
       $this->graph->yaxis->SetFont($this->font);
       $this->graph->xaxis->SetLabelAngle($this->rotatexlegend);
       $this->graph->yaxis->SetLabelAngle($this->rotateylegend);
+      $this->graph->legend->SetFont($this->font);
+    }
+    if($this->legendposition) {
+      $tmp = split(",", $this->legendposition);
+      $this->graph->legend->Pos($tmp[0],$tmp[1]);
     }
 
     $this->graph->yaxis->scale->SetAutoMin($this->min);
@@ -351,7 +397,7 @@ class JpchartMWLine extends JpchartMW {
     for($i = $data_start; $i < count($this->datay); $i++) {
       if(array_search($i, $disable_row)) continue;
       $lineplot = new LinePlot($this->datay[$i], $this->datax);
-      $lineplot->mark->SetType(MARK_FILLEDCIRCLE);
+      $lineplot->mark->SetType($this->mark);
       $lineplot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
       $lineplot->SetLegend($this->labels[$i]);
       if($this->isstacked) {
@@ -390,7 +436,12 @@ class JpchartMWPie extends JpchartMW {
         $this->datay[] = $raw_data[0];
       }
     }
-    $pie = ($this->is3d ? new PiePlot3D($this->datay) : new PiePlot($this->datay));
+    if($this->is3d) {
+      $pie = new PiePlot3D($this->datay);
+      $pie->SetAngle($this->angle);
+    } else {
+      $pie = new PiePlot($this->datay);
+    }
     if(count($this->labels) == count($this->datay))
       $pie->SetLegends($this->labels);
     $this->graph->Add($pie);
