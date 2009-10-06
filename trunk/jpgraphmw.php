@@ -51,6 +51,42 @@ function jpChartSetup() {
   $wgParser->setHook('jppie', 'jpPieRender');
 }
 
+$jpgraphFontList = array("Ahron" => FF_AHRON,
+"Arial" => FF_ARIAL,
+"Big5" => FF_BIG5,
+"Calculator" => FF_CALCULATOR,
+"Chinese" => FF_CHINESE,
+"Comic" => FF_COMIC,
+"Computer" => FF_COMPUTER,
+"Courier" => FF_COURIER,
+"David" => FF_DAVID,
+"Digital" => FF_DIGITAL,
+"DV_SansSerifCond" => FF_DV_SANSSERIFCOND,
+"DV_SansSerif" => FF_DV_SANSSERIF,
+"DV_SansSerifMono" => FF_DV_SANSSERIFMONO,
+"DV_SerifCond" => FF_DV_SERIFCOND,
+"DV_Serif" => FF_DV_SERIF,
+"Font0" => FF_FONT0,
+"Font1" => FF_FONT1,
+"Font2" => FF_FONT2,
+"Georgia" => FF_GEORGIA,
+"Gothic" => FF_GOTHIC,
+"Mincho" => FF_MINCHO,
+"Miriam" => FF_MIRIAM,
+"PGothic" => FF_PGOTHIC,
+"PMincho" => FF_PMINCHO,
+"Simsun" => FF_SIMSUN,
+"Times" => FF_TIMES,
+"Trebuche" => FF_TREBUCHE,
+"UserFont1" => FF_USERFONT1,
+"UserFont2" => FF_USERFONT2,
+"UserFont3" => FF_USERFONT3,
+"UserFont" => FF_USERFONT,
+"Vera" => FF_VERA,
+"VeraMono" => FF_VERAMONO,
+"VeraSerif" => FF_VERASERIF,
+"Verdana" => FF_VERDANA);
+
 // Main class
 abstract class JpchartMW {
   var $size;
@@ -146,18 +182,31 @@ abstract class JpchartMW {
   }
   // Parse argument and set the parameters accordingly
   function parseArgs($args) {
+    global $jpgraphFontList;
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
-      if(preg_match("/^(no)?(size|type|rotatexlegend|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                    "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
-        $var = "\$this->".$field[2];
-        eval("$var = (\$field[1] == \"no\" ? \"\" : \$value);");
+      if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
+                               "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+        $var = "\$this->".$field[2].' = false;';
+        eval($var);
+      } else if(preg_match("/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
+                              "margin|group|fill|nofill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+        $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
+        eval($var);
       } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
         $var = '$this->has'.$field[2];
         eval("$var = (\$field[1] != 'no');");
-      } else if(preg_match("/^(no|not)?(horizontal|antialias|stacked|3d)$/", $name, $field)) {
-        $var = '$this->is'.$field[2];
-        eval("$var = (!preg_match(\"/^(no|not)$/\", \$field[1]));");
+      } else if(preg_match("/^(no|not)(horizontal|antialias|stacked|3d)$/", $name, $field)) {
+        $var = '$this->is'.$field[2].' = false;';
+        eval($var);
+      } else if(preg_match("/^(horizontal|antialias|stacked|3d)$/", $name, $field)) {
+        $var = '$this->is'.$field[1];
+        eval("$var = (!preg_match(\"/^(no|not)$/\", \$value));");
+      } else if(preg_match("/font/", $name)) {
+        $this->font = $jpgraphFontList[$value];
+        if(!$this->font) {
+          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_values($jpgraphFont)));
+        }
       } else switch($name) {
         case "grid":
           switch($value) {
@@ -201,7 +250,8 @@ abstract class JpchartMW {
       if($this->usettf)
         $this->graph->title->SetFont($this->font, FS_BOLD, 12);
     }
-    $this->graph->img->SetAntiAliasing($this->isantialias);
+    if($this->isantialias)
+      $this->graph->img->SetAntiAliasing();
     if($this->margin) {
       list($lm, $rm, $tm, $bm) = split(",", $this->margin);
       $this->graph->SetMargin($lm, $rm, $tm, $bm);
