@@ -136,8 +136,8 @@ abstract class JpchartMW {
   var $legendposition;
   var $rotatexlegend;
   var $rotateylegend;
-  var $hasxlabel;
-  var $hasylabel;
+  var $xlabel;
+  var $ylabel;
   var $haslegend;
   var $hasxgrid;
   var $hasygrid;
@@ -172,8 +172,8 @@ abstract class JpchartMW {
   // default init value
   function init() {
     $this->fieldsep = ",";
-    $this->hasxlabel = false;
-    $this->hasylabel = false;
+    $this->xlabel = false;
+    $this->ylabel = false;
     $this->scale = false;
     $this->dateformat = false;
     $this->haslegend = false;
@@ -222,14 +222,14 @@ abstract class JpchartMW {
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
-      } else if(preg_match("/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                              "margin|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+      } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
+                               "margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
-      } else if(preg_match("/^(no)?(legend|xlabel|ylabel)$/", $name, $field)) {
+      } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
         $var = '$this->has'.$field[2];
         eval("$var = (\$field[1] != 'no');");
       } else if(preg_match("/^(no|not)(horizontal|antialias|stacked|3d)$/", $name, $field)) {
@@ -314,6 +314,10 @@ abstract class JpchartMW {
     } else {
       $this->graph->SetScale("textlin");
     }
+    if($this->xlabel)
+      $this->graph->xaxis->title->Set($this->xlabel);
+    if($this->ylabel)
+      $this->graph->yaxis->title->Set($this->ylabel);
     $this->graph->ygrid->SetFill(true, '#EFEFEF@0.5', '#BBCCFF@0.5');
     if($this->dateformat)
       $this->graph->xaxis->scale->SetDateFormat($this->dateformat);
@@ -321,6 +325,8 @@ abstract class JpchartMW {
     if($this->usettf) {
       $this->graph->xaxis->SetFont($this->font);
       $this->graph->yaxis->SetFont($this->font);
+      $this->graph->xaxis->title->SetFont($this->font);
+      $this->graph->yaxis->title->SetFont($this->font);
       $this->graph->xaxis->SetLabelAngle($this->rotatexlegend);
       $this->graph->yaxis->SetLabelAngle($this->rotateylegend);
       $this->graph->legend->SetFont($this->font);
