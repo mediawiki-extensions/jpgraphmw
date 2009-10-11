@@ -157,6 +157,7 @@ abstract class JpchartMW {
   var $datax;
   var $labels;
   var $plot_list;
+  var $islinear;
   // Constructor
   function JpchartMW($args) {
     global $jpgraphWikiDefaults;
@@ -187,7 +188,7 @@ abstract class JpchartMW {
     $this->size = "400x300";
     $this->margin = "60,20,50,80";
     $this->title = "";
-    $this->colors = "#5555ff,#ff5555,#55ff55,#ff55ff,#A0F000,#ffff55,#956575,#55ffff,#ff00ff,#7f7f00,#A07fA0,#7f7f7f,#7f007f";
+    $this->colors = "#5555ff,#55ff55,#ff55ff,#A0F000,#ffff55,#956575,#55ffff,#ff00ff,#7f7f00,#A07fA0,#7f7f7f,#7f007f";
     $this->fill = "";
     $this->isstacked = false;
     $this->is3d = false;
@@ -196,7 +197,7 @@ abstract class JpchartMW {
     $this->max = false;
     $this->ysteps = 2;
     $this->format = "png";
-    $this->type = "default";
+    $this->type = "line";
     $this->disable = "";
     $this->font = FF_DV_SANSSERIF;
     $this->mark = MARK_FILLEDCIRCLE;
@@ -205,6 +206,7 @@ abstract class JpchartMW {
     $this->datax = false;
     $this->labels = array();
     $this->plot_list = array();
+    $this->xistime = false;
   }
   // debug function
   function debug($args) {
@@ -222,11 +224,11 @@ abstract class JpchartMW {
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
@@ -297,6 +299,16 @@ abstract class JpchartMW {
       list($lm, $rm, $tm, $bm) = split(",", $this->margin);
       $this->graph->SetMargin($lm, $rm, $tm, $bm);
     }
+    if($this->scale) {
+      if(preg_match("/^(dat|lin|text|log|int)(lin|log|int)$/", $this->scale, $tmp_scale)) {
+        $this->graph->SetScale($this->scale);
+        $this->islinear = preg_match("/^(lin|dat|log)$/", $tmp_scale[1]);
+      } else {
+        throw new Exception("Error while parsing scale type. Unknown type ".$this->scale.".");
+      }
+    } else {
+      $this->graph->SetScale("textlin");
+    }
   }
   abstract function instanciateGraph();
   // part to implement in order to handle bar, line, pie etc.
@@ -309,11 +321,6 @@ abstract class JpchartMW {
       $this->graph->xgrid->Show();
     if($this->hasygrid)
       $this->graph->ygrid->Show();
-    if($this->scale) {
-      $this->graph->SetScale("datlin");
-    } else {
-      $this->graph->SetScale("textlin");
-    }
     if($this->xlabel)
       $this->graph->xaxis->title->Set($this->xlabel);
     if($this->ylabel)
@@ -359,6 +366,7 @@ class JpchartMWLine extends JpchartMW {
     $this->graph = new Graph($this->size_x, $this->size_y, "auto");
   }
   function parse($input, $parser) {
+    $chart_type = split(",", $this->type);
     // retrieving data
     $i = 0;
     $max_row_count = -1;
@@ -383,38 +391,66 @@ class JpchartMWLine extends JpchartMW {
       }
       $i++;
     }
+    $data_start = 0;
     // if(x, y) curve => set datax with first set of datay
-    if($this->scale) {
+    if($this->islinear) {
       $this->datax = $this->datay[0];
       $data_start = 1;
-      if($this->scale == "xy") {
-        $this->dateformat = "U";
-      } else {
+      if($this->xistime) {
         for($i = 0; $i < count($this->datax); $i++) {
           $this->datax[$i] = strtotime($this->datax[$i]);
         }
       }
-    } else {
-      $data_start = 0;
     }
 
+    // Setting default value for chart type array. by default : line.
+    // If only one type => applying same type for everybody
+    if(count($chart_type) == 0)
+      $chart_type [0]= "line";
+    if(count($chart_type) != $max_row_count) {
+      $tmp_type = $chart_type[0];
+      $chart_type = array();
+      for($i = 0; $i < $max_row_count; $i++) {
+        $chart_type [$i]= $tmp_type;
+      }
+    }
     $disable_row = split(",", "-1,".$this->disable);
     // Creating data object
     for($i = $data_start; $i < count($this->datay); $i++) {
       if(array_search($i, $disable_row)) continue;
-      $lineplot = new LinePlot($this->datay[$i], $this->datax);
-      $lineplot->mark->SetType($this->mark);
-      $lineplot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
-      $lineplot->SetLegend($this->labels[$i]);
+      $show_plot = false;
+      switch($chart_type[$i]) {
+        case "bar":
+          $plot = new BarPlot($this->datay[$i], $this->datax);
+          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
+          break;
+        case "area":
+          $plot = new LinePlot($this->datay[$i], $this->datax);
+          $plot->SetColor("gray");
+          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
+          $show_plot = true;
+          break;
+        default:
+        case "line":
+          $plot = new LinePlot($this->datay[$i], $this->datax);
+          $show_plot = true;
+          break;
+      }
+      if($show_plot) {
+        $plot->mark->SetType($this->mark);
+        $plot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
+      }
+      $plot->SetLegend($this->labels[$i]);
       if($this->isstacked) {
-        $plot_list []= $lineplot;
-        $lineplot->SetColor("gray");
-        $lineplot->SetFillColor($this->color_list[$i % count($this->color_list)]);
+        $plot_list []= $plot;
+        $plot->SetColor("black");
+        $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
       } else {
-        $lineplot->SetColor($this->color_list[$i % count($this->color_list)]);
-        $this->graph->Add($lineplot);
+        $plot->SetColor($this->color_list[$i % count($this->color_list)]);
+        $this->graph->Add($plot);
       }
     }
+    // stacked case
     if($this->isstacked) {
       $point_area = new AccLinePlot($plot_list);
       $this->graph->Add($point_area);
