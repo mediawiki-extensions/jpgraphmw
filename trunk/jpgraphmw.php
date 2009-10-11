@@ -129,6 +129,7 @@ abstract class JpchartMW {
   var $fill;
   var $isstacked;
   var $is3d;
+  var $explode;
   var $angle;
   var $fieldsep;
   var $scale;
@@ -224,11 +225,11 @@ abstract class JpchartMW {
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
-                               "margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
@@ -502,6 +503,12 @@ class JpchartMWPie extends JpchartMW {
       $pie->SetAngle($this->angle);
     } else {
       $pie = new PiePlot($this->datay);
+    }
+    $explode_pie_list = split(",", $this->explode);
+    if(count($explode_pie_list) == 1) {
+      $pie->ExplodeAll($explode_pie_list[0]);
+    } else {
+      $pie->Explode($explode_pie_list);
     }
     if(count($this->labels) == count($this->datay))
       $pie->SetLegends($this->labels);
