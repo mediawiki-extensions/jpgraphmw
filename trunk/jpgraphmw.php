@@ -62,7 +62,7 @@ $jpgraphMarkList = array(
 "Star" => MARK_STAR,
 "X" => MARK_X,
 "Lefttriangle" => MARK_LEFTTRIANGLE,
-"Righttriangle" => MARK_RIGHTTRIANGLE/*,
+"Righttriangle" => MARK_RIGHTTRIANGLE,
 "Flash" => MARK_FLASH,
 "Img" => MARK_IMG,
 "Flag1" => MARK_FLAG1,
@@ -79,7 +79,7 @@ $jpgraphMarkList = array(
 "Img_sball" => MARK_IMG_SBALL,
 "Img_mball" => MARK_IMG_MBALL,
 "Img_lball" => MARK_IMG_LBALL,
-"Img_bevel" => MARK_IMG_BEVEL*/);
+"Img_bevel" => MARK_IMG_BEVEL);
 
 $jpgraphFontList = array(
 "Ahron" => FF_AHRON,
@@ -181,8 +181,8 @@ abstract class JpchartMW {
     $this->hasxgrid = false;
     $this->hasygrid = false;
     $this->ishorizontal = false;
-    $this->isantialias = true;   // set to false if you don't have antialias support in GD
-    $this->usettf = true;        // set to false if you don't have ttf support in GD
+    $this->isantialias = true;   // use $jpgraphWikiDefaults = Array("antialias" => "no"); to disable antialias
+    $this->usettf = true;        // use $jpgraphWikiDefaults = Array("usettf" => "no"); to disable ttf
     $this->rotatexlegend = 0;
     $this->rotateylegend = 0;
     $this->size = "400x300";
@@ -207,6 +207,7 @@ abstract class JpchartMW {
     $this->labels = array();
     $this->plot_list = array();
     $this->xistime = false;
+    $this->islinear = false;
   }
   // debug function
   function debug($args) {
@@ -308,6 +309,7 @@ abstract class JpchartMW {
       }
     } else {
       $this->graph->SetScale("textlin");
+      $this->islinear = false;
     }
   }
   abstract function instanciateGraph();
@@ -414,10 +416,13 @@ class JpchartMWLine extends JpchartMW {
         $chart_type [$i]= $tmp_type;
       }
     }
-    $disable_row = split(",", "-1,".$this->disable);
+    $disable_row = array();
+    foreach(split(",", $this->disable) as $elt) {
+      $disable_row[$elt] = true;
+    }
     // Creating data object
     for($i = $data_start; $i < count($this->datay); $i++) {
-      if(array_search($i, $disable_row)) continue;
+      if(array_key_exists(($i + 1), $disable_row) && $disable_row[$i + 1]) continue;
       $show_plot = false;
       switch($chart_type[$i]) {
         case "bar":
