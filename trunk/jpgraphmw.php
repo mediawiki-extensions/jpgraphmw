@@ -200,7 +200,7 @@ abstract class JpchartMW {
     $this->type = "line";
     $this->disable = "";
     $this->font = FF_DV_SANSSERIF;
-    $this->mark = MARK_FILLEDCIRCLE;
+    $this->mark = "Filledcircle";
     // internals
     $this->datay = array();
     $this->datax = false;
@@ -221,7 +221,6 @@ abstract class JpchartMW {
   // Parse argument and set the parameters accordingly
   function parseArgs($args) {
     global $jpgraphFontList;
-    global $jpgraphMarkList;
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
@@ -244,13 +243,10 @@ abstract class JpchartMW {
       } else if($name == "font") {
         $this->font = $jpgraphFontList[$value];
         if(!$this->font) {
-          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_values($jpgraphFontList)));
+          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_keys($jpgraphFontList)));
         }
-      } else if($name == "linemark") {
-        $this->mark = $jpgraphMarkList[$value];
-        if(!$this->mark) {
-          throw new Exception("Unknown mark type($value). Possible values are: ".implode(", ", array_values($jpgraphMarkList)));
-        }
+      } else if(preg_match("/^(linemark|mark)$/", $name)) {
+        $this->mark = $value;
       } else switch($name) {
         case "grid":
           switch($value) {
@@ -368,7 +364,9 @@ class JpchartMWLine extends JpchartMW {
     $this->graph = new Graph($this->size_x, $this->size_y, "auto");
   }
   function parse($input, $parser) {
+    global $jpgraphMarkList;
     $chart_type = split(",", $this->type);
+    $mark_type = split(",", $this->mark);
     // retrieving data
     $i = 0;
     $max_row_count = -1;
@@ -412,10 +410,21 @@ class JpchartMWLine extends JpchartMW {
     if(count($chart_type) != $max_row_count) {
       $tmp_type = $chart_type[0];
       $chart_type = array();
-      for($i = 0; $i < $max_row_count; $i++) {
-        $chart_type [$i]= $tmp_type;
+      for($i = count($chart_type); $i < $max_row_count; $i++) {
+        $chart_type[$i] = $tmp_type;
       }
     }
+    // same thing for mark
+    if(count($mark_type) == 0)
+      $mark_type [0]= "line";
+    if(count($mark_type) != $max_row_count) {
+      $tmp_mark = $mark_type[0];
+      $mark_type = array();
+      for($i = count($mark_type); $i < $max_row_count; $i++) {
+        $mark_type[$i] = $tmp_mark;
+      }
+    }
+    // Possibility to ignore data
     $disable_row = array();
     foreach(split(",", $this->disable) as $elt) {
       $disable_row[$elt] = true;
@@ -427,6 +436,7 @@ class JpchartMWLine extends JpchartMW {
       switch($chart_type[$i]) {
         case "bar":
           $plot = new BarPlot($this->datay[$i], $this->datax);
+          $plot->SetWidth(1);
           $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
           break;
         case "area":
@@ -442,7 +452,11 @@ class JpchartMWLine extends JpchartMW {
           break;
       }
       if($show_plot) {
-        $plot->mark->SetType($this->mark);
+        $mark_id = $jpgraphMarkList[$mark_type[$i]];
+        if(!$mark_id) {
+          throw new Exception("Unknown mark type(".$mark_type[$i]."). Possible values are: ".implode(", ", array_keys($jpgraphMarkList)));
+        }
+        $plot->mark->SetType($mark_id);
         $plot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
       }
       $plot->SetLegend($this->labels[$i]);
