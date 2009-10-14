@@ -135,6 +135,7 @@ abstract class JpchartMW {
   var $scale;
   var $dateformat;
   var $legendposition;
+  var $barwidth;
   var $rotatexlegend;
   var $rotateylegend;
   var $xlabel;
@@ -181,6 +182,8 @@ abstract class JpchartMW {
     $this->haslegend = false;
     $this->hasxgrid = false;
     $this->hasygrid = false;
+    $this->legendposition = false;
+    $this->barwidth = 0.5;
     $this->ishorizontal = false;
     $this->isantialias = true;   // use $jpgraphWikiDefaults = Array("antialias" => "no"); to disable antialias
     $this->usettf = true;        // use $jpgraphWikiDefaults = Array("usettf" => "no"); to disable ttf
@@ -224,11 +227,11 @@ abstract class JpchartMW {
     global $jpgraphFontList;
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
-      if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
+      if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
                                "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
-      } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|title|colors|nocolors|disable|".
+      } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
                                "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
@@ -437,7 +440,7 @@ class JpchartMWLine extends JpchartMW {
       switch($chart_type[$i]) {
         case "bar":
           $plot = new BarPlot($this->datay[$i], $this->datax);
-          $plot->SetWidth(1);
+          $plot->SetWidth($this->barwidth);
           $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
           break;
         case "area":
