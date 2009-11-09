@@ -228,11 +228,11 @@ abstract class JpchartMW {
     if(is_null($args)) return;
     foreach( $args as $name => $value ) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xistime|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
@@ -304,6 +304,7 @@ abstract class JpchartMW {
       if(preg_match("/^(dat|lin|text|log|int)(lin|log|int)$/", $this->scale, $tmp_scale)) {
         $this->graph->SetScale($this->scale);
         $this->islinear = preg_match("/^(lin|dat|log)$/", $tmp_scale[1]);
+        $this->xistime = preg_match("/^(dat)$/", $tmp_scale[1]);
       } else {
         throw new Exception("Error while parsing scale type. Unknown type ".$this->scale.".");
       }
