@@ -283,7 +283,7 @@ abstract class JpchartMW {
     $this->color_list = split(",", $this->colors);
     for($i = 0; $i < count($this->color_list); $i++) {
       // add a '#' if the user use an hexa color
-      if(preg_match("/[a-fA-F0-9]{6}/", $this->color_list[$i]))
+      if(preg_match("/^[a-fA-F0-9]{6}/", $this->color_list[$i]))
         $this->color_list[$i] = "#".$this->color_list[$i];
     }
 
