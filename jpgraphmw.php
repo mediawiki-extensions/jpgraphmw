@@ -161,11 +161,11 @@ abstract class JpchartMW {
   var $plot_list;
   var $islinear;
   // Constructor
-  function JpchartMW($args) {
+  function JpchartMW($args, $default_type) {
     global $jpgraphWikiDefaults;
     global $jpgraphLinesDefaults;
 
-    $this->init();
+    $this->init($default_type);
     $this->parseArgs($jpgraphWikiDefaults);
     $this->parseArgs($jpgraphLinesDefaults);
     $this->parseArgs($args);
@@ -173,7 +173,7 @@ abstract class JpchartMW {
   }
 
   // default init value
-  function init() {
+  function init($default_type) {
     $this->fieldsep = ",";
     $this->xlabel = false;
     $this->ylabel = false;
@@ -201,7 +201,7 @@ abstract class JpchartMW {
     $this->max = false;
     $this->ysteps = 2;
     $this->format = "png";
-    $this->type = "line";
+    $this->type = $default_type;
     $this->disable = "";
     $this->font = FF_DV_SANSSERIF;
     $this->mark = "Filledcircle";
@@ -362,8 +362,8 @@ abstract class JpchartMW {
 }
 
 class JpchartMWLine extends JpchartMW {
-  function JpchartMWLine($args) {
-    JpchartMW::JpchartMW($args);
+  function JpchartMWLine($args, $type = "line") {
+    JpchartMW::JpchartMW($args, $type);
   }
   function instanciateGraph() {
     $this->graph = new Graph($this->size_x, $this->size_y, "auto");
@@ -520,59 +520,6 @@ class JpchartMWPie extends JpchartMW {
   }
 }
 
-class JpchartMWBar extends JpchartMW {
-  function JpchartMBar($args) {
-    JpchartMW::JpchartMW($args);
-  }
-  function instanciateGraph() {
-    $this->graph = new Graph($this->size_x, $this->size_y);
-    $this->graph->SetScale("intlin");
-  }
-  function parseGroupBar($input) {
-    $line_count = 0;
-    // retrieving data
-    $this->datay = array();
-    foreach(split("\n", $input) as $line) {
-      // skip empty line or comments
-      if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
-      $line_array = split($this->fieldsep, $line);
-      // Storing data
-      for($i = 0; $i < count($line_array); $i++) {
-        $this->datay[$i][] = $line_array[$i];
-      }
-      $line_count++;
-    }
-    if($line_count == 0) return false;
-    $bar_list = array();
-    // Creating data object
-    for($i = 0; $i < count($this->datay); $i++) {
-      $barplot = new BarPlot($this->datay[$i]);
-      $barplot->SetFillColor($this->color_list[$i % count($this->color_list)]);
-      /*$barplot->SetFillGradient($this->color_list[$i % count($this->color_list)],
-                                  $this->color_list[($i + 1) % count($this->color_list)], GRAD_VERT);*/
-      $bar_list []= $barplot;
-    }
-    if(count($bar_list) == 1) {
-      return $bar_list[0];
-    } else {
-      return new AccBarPlot($bar_list);
-    }
-  }
-  function parse($input, $parser) {
-    $group_bar_data = preg_split("/groupbar:/", $input);
-    $group_list = array();
-    foreach($group_bar_data as $group_bar) {
-      if($result = $this->parseGroupBar($group_bar))
-        $group_list []= $result;
-    }
-    if(count($group_list) == 1) {
-      $this->graph->Add($group_list[0]);
-    } else {
-      $this->graph->Add(new GroupBarPlot($group_list));
-    }
-  }
-}
-
 // -----------------------------------------------------------------------------
 function jpLinesRender($input, $args, $parser) {
   try {
@@ -587,7 +534,7 @@ function jpLinesRender($input, $args, $parser) {
 
 function jpBarsRender($input, $args, $parser) {
   try {
-    $jpchart = new JpchartMWBar($args);
+    $jpchart = new JpchartMWLine($args, "bar");
     $jpchart->parse($input, $parser);
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
