@@ -185,6 +185,81 @@ $jpgraphTickAlign = array (
 "3y" => DSUTILS_YEAR5
 );
 
+// -----------------------------------------------------------------------------
+
+$jpgraph_help = "
+
+<p>In order to create chart, you can use the following tags :</p>
+- Simple line chart :
+<pre>&lt;jpline&gt;
+x,y
+1,2
+2,3
+&lt;/jpline&gt;</pre>
+- Simple bar chart :
+<pre>&lt;jpbar&gt;
+x,y
+1,2
+2,3
+&lt;/jpbar&gt;</pre>
+- Simple pie chart :
+<pre>&lt;jppie title='an apple pie'&gt;
+or,15
+carbone,38
+acier,47
+&lt;/jppie&gt;</pre>
+
+<p>You can use the following parameters to customize your charts :</p>
+<pre>
+  size               size of the graphic (by default 400x300)
+  type               type of graphic. Value can be line, bar or area.
+  rotatexlegend      rotate x legend of n degrees
+  rotateylegend      same as above
+  usettf             use ttf to render text. Use value no to disable ttf rendering
+  legendposition     set legend position
+  barwidth           value of bar width
+  title              title of this chart
+  colors             use colors to render graphics (use ',' to use multiple colors).
+  disable            use this to disable data rows (ex : disable=1,2 to disable first and second column)
+  explode            use this keyword with pie chart
+  margin             set margin value (ex : 10,0,10,0)
+  xlabel             set xlabel
+  ylabel             set ylabel
+  xlabelformat       set label format
+  ylabelformat
+  fill               set fill value for background
+  dateformat         set date format
+  scale              scale value. Possible value are: (dat|lin|text|log|int)(lin|log|int)
+  format             image format to output (default: png)
+  fieldsep           change fieldsep for data parsing (default ',')
+  max                set max value
+  min                set min value
+  timealign          align start and end of data with something. Possible values are: ".implode(", ", array_keys($jpgraphTickAlign))."
+  tickalign          set tick frequency.".implode(", ", array_keys($jpgraphTickAlign))."
+  horizontal         set chart direction as horizontal
+  antialias          turn on/off antialias (noantialias or antialias=no)
+  stacked            use stacked chart
+  font               set font name. Possible values are: ".implode(", ", array_keys($jpgraphFontList))."
+  linemark/mark      change linemark ".implode(", ", array_keys($jpgraphMarkList))."
+  grid               draw grid. Possible values are x, y, xy or yx
+</pre>
+";
+
+class JpgraphMWException extends Exception {
+  public function __construct($message = null, $code = 0) {
+    global $jpgraph_help;
+    if(!$message) {
+      parent::__construct("$message $jpgraph_help", $code);
+    } else {
+      parent::__construct("<pre>$message</pre>$jpgraph_help", $code);
+    }
+  }
+  public function __toString() {
+    return get_class($this)." '{$this->message}' in {$this->file}({$this->line})\n".
+                            "{$this->getTraceAsString()}";
+  }
+}
+
 // Main class
 abstract class JpchartMW {
   var $size;
@@ -215,7 +290,6 @@ abstract class JpchartMW {
   var $ishorizontal;
   var $min;
   var $max;
-  var $ysteps;
   var $format;
   var $isantialias;
   var $usettf;
@@ -265,14 +339,14 @@ abstract class JpchartMW {
     $this->size = "400x300";
     $this->margin = "60,20,50,80";
     $this->title = "";
-    $this->colors = "#5555ff,#55ff55,#ff55ff,#A0F000,#ffff55,#956575,#55ffff,#ff00ff,#7f7f00,#A07fA0,#7f7f7f,#7f007f";
-    $this->fill = "";
+    $this->colors = "#5555ff,#55ff55@0.8,#ff55ff,#A0F000@0.8,#ffff55,#956575@0.8,".
+                    "#55ffff,#ff00ff@0.8,#7f7f00,#A07fA0@0.8,#7f7f7f,#7f007f@0.8";
+    $this->fill = "#EFEFEF@0.5,#BBCCFF@0.5";
     $this->isstacked = false;
     $this->is3d = false;
     $this->angle = 50;
     $this->min = 0;
     $this->max = false;
-    $this->ysteps = 2;
     $this->format = "png";
     $this->type = $default_type;
     $this->disable = "";
@@ -302,14 +376,16 @@ abstract class JpchartMW {
     global $jpgraphFontList;
     if(is_null($args)) return;
     foreach($args as $name => $value) {
-      if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|group|fill|dateformat|scale|format|fieldsep|".
-                               "max|min|timealign|tickalign|ysteps)$/", $name, $field)) {
+      if(preg_match("/help/", $name)) {
+        throw new JpgraphMWException("");
+      } else if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
+                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|group|fill|dateformat|scale|format|fieldsep|".
-                               "max|min|timealign|tickalign|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
@@ -324,7 +400,7 @@ abstract class JpchartMW {
       } else if($name == "font") {
         $this->font = $jpgraphFontList[$value];
         if(!$this->font) {
-          throw new Exception("Unknown font name($value). Possible values are: ".implode(", ", array_keys($jpgraphFontList)));
+          throw new JpgraphMWException("Unknown font name($value). Possible values are: ".implode(", ", array_keys($jpgraphFontList)));
         }
       } else if(preg_match("/^(linemark|mark)$/", $name)) {
         $this->mark = $value;
@@ -355,7 +431,7 @@ abstract class JpchartMW {
             $this->hasygrid=false;
             break;
           default:
-            throw new Exception("Unknown option '$name'.");
+            throw new JpgraphMWException("Unknown option '$name'.");
         }
       }
     }
@@ -388,7 +464,7 @@ abstract class JpchartMW {
         $this->islinear = preg_match("/^(lin|dat|log)$/", $tmp_scale[1]);
         $this->xistime = preg_match("/^(dat)$/", $tmp_scale[1]);
       } else {
-        throw new Exception("Error while parsing scale type. Unknown type ".$this->scale.".");
+        throw new JpgraphMWException("Error while parsing scale type. Unknown type ".$this->scale.".");
       }
     } else {
       $this->graph->SetScale("textlin");
@@ -402,11 +478,11 @@ abstract class JpchartMW {
       $timealign = split(",", $this->timealign);
       for($i = 0; $i < count($timealign); $i++)
         if($timealign[$i] && !array_key_exists($timealign[$i], $jpgraphTimeAlign))
-          throw new Exception("Unknown time align value (".$timealign[$i]."). Possible values are: ".
+          throw new JpgraphMWException("Unknown time align value (".$timealign[$i]."). Possible values are: ".
                               implode(", ", array_keys($jpgraphTimeAlign)));
     }
     if($this->tickalign && !array_key_exists($this->tickalign, $jpgraphTickAlign)) {
-       throw new Exception("Unknown tick align value (".$this->tickalign."). Possible values are: ".
+       throw new JpgraphMWException("Unknown tick align value (".$this->tickalign."). Possible values are: ".
                             implode(", ", array_keys($jpgraphTickAlign)));
     }
   }
@@ -430,7 +506,16 @@ abstract class JpchartMW {
       $this->graph->xaxis->SetLabelFormatString($this->xlabelformat, $this->xistime);
     if($this->ylabelformat)
       $this->graph->yaxis->SetLabelFormatString($this->ylabelformat);
-    $this->graph->ygrid->SetFill(true, '#EFEFEF@0.5', '#BBCCFF@0.5');
+    if($this->fill) {
+      $tmp = split(",", $this->fill);
+      if(count($tmp) == 2) {
+        $this->graph->ygrid->SetFill(true, $tmp[0], $tmp[1]);
+      } else if(count($tmp) == 1) {
+        $this->graph->ygrid->SetFill(true, $tmp[0], $tmp[0]);
+      } else {
+        throw new JpgraphMWException("Error while parsing fill value (".$this->fill.").");
+      }
+    }
     if($this->dateformat)
       $this->graph->xaxis->scale->SetDateFormat($this->dateformat);
 
@@ -503,7 +588,7 @@ class JpchartMWLine extends JpchartMW {
       if($max_row_count == -1)
         $max_row_count = count($line_array);
       if($max_row_count != count($line_array)) {
-        throw new Exception("Error while parsing '".implode($fieldsep, $line_array)."' : bad number of row.");
+        throw new Exception("Error while parsing '".implode($this->fieldsep, $line_array)."' : bad number of row.");
       }
       $i++;
     }
@@ -553,12 +638,12 @@ class JpchartMWLine extends JpchartMW {
         case "bar":
           $plot = new BarPlot($this->datay[$i], $this->datax);
           $plot->SetWidth($this->barwidth);
-          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
+          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]);
           break;
         case "area":
           $plot = new LinePlot($this->datay[$i], $this->datax);
           $plot->SetColor("gray");
-          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
+          $plot->SetFillColor($this->color_list[$i % count($this->color_list)]);
           $show_plot = true;
           break;
         default:
@@ -570,7 +655,7 @@ class JpchartMWLine extends JpchartMW {
       if($show_plot) {
         $mark_id = $jpgraphMarkList[$mark_type[$i]];
         if(!$mark_id) {
-          throw new Exception("Unknown mark type(".$mark_type[$i]."). Possible values are: ".implode(", ", array_keys($jpgraphMarkList)));
+          throw new JpgraphMWException("Unknown mark type(".$mark_type[$i]."). Possible values are: ".implode(", ", array_keys($jpgraphMarkList)));
         }
         $plot->mark->SetType($mark_id);
         $plot->mark->SetFillColor($this->color_list[$i % count($this->color_list)]);
@@ -579,7 +664,7 @@ class JpchartMWLine extends JpchartMW {
       if($this->isstacked) {
         $plot_list []= $plot;
         $plot->SetColor("black");
-        $plot->SetFillColor($this->color_list[$i % count($this->color_list)]."@0.5");
+        $plot->SetFillColor($this->color_list[$i % count($this->color_list)]);
       } else {
         $plot->SetColor($this->color_list[$i % count($this->color_list)]);
         $this->graph->Add($plot);
@@ -639,7 +724,7 @@ function jpLinesRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return "<pre>".$e->getMessage()."</pre>";
+    return $e->getMessage();
   }
 }
 
@@ -650,7 +735,7 @@ function jpBarsRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return "<pre>".$e->getMessage()."</pre>";
+    return $e->getMessage();
   }
 }
 
@@ -661,7 +746,7 @@ function jpPieRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return "<pre>".$e->getMessage()."</pre>";
+    return $e->getMessage();
   }
 }
 
