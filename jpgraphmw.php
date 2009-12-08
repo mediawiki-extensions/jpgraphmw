@@ -26,6 +26,7 @@ require_once("$jpgraph_home/src/jpgraph_bar.php");
 require_once("$jpgraph_home/src/jpgraph_date.php");
 require_once("$jpgraph_home/src/jpgraph_pie.php");
 require_once("$jpgraph_home/src/jpgraph_pie3d.php");
+require_once("$jpgraph_home/src/jpgraph_utils.inc.php");
 
 if(! defined( 'MEDIAWIKI' ) ) {
   echo( "This is an extension to the MediaWiki package and cannot be run standalone.\n" );
@@ -118,6 +119,72 @@ $jpgraphFontList = array(
 "VeraSerif" => FF_VERASERIF,
 "Verdana" => FF_VERDANA);
 
+$jpgraphTimeAlign = array (
+// Hour adjustement
+"h"    => HOURADJ_1,
+"hour" => HOURADJ_1,
+"1h"   => HOURADJ_1,
+"2h"   => HOURADJ_2,
+"3h"   => HOURADJ_3,
+"4h"   => HOURADJ_4,
+"6h"   => HOURADJ_6,
+"12h"  => HOURADJ_12,
+// min
+"min"    => MINADJ_1,
+"minute" => MINADJ_1,
+"1min"   => MINADJ_1,
+"5min"   => MINADJ_5,
+"10min"  => MINADJ_10,
+"15min"  => MINADJ_15,
+"30min"  => MINADJ_30,
+// sec
+"s"      => SECADJ_1,
+"sec"    => SECADJ_1,
+"second" => SECADJ_1,
+"1s"     => SECADJ_1,
+"5s"     => SECADJ_5,
+"10s"    => SECADJ_10,
+"15s"    => SECADJ_15,
+"30s"    => SECADJ_30,
+// year
+"year"   => YEARADJ_1,
+"1y"     => YEARADJ_1,
+"2y"     => YEARADJ_2,
+"5y"     => YEARADJ_5,
+
+"month" => MONTHADJ_1,
+"1m"    => MONTHADJ_1,
+"6m"    => MONTHADJ_6,
+
+"day"   => DAYADJ_1,
+"1d"    => DAYADJ_1,
+"week"  => DAYADJ_7
+);
+
+$jpgraphTickAlign = array (
+// Month
+"month" => DSUTILS_MONTH,
+"1m" => DSUTILS_MONTH,
+"2m" => DSUTILS_MONTH2,
+"3m" => DSUTILS_MONTH3,
+"6m" => DSUTILS_MONTH6,
+// Week
+"week" => DSUTILS_WEEK1,
+"1w" => DSUTILS_WEEK1,
+"2w" => DSUTILS_WEEK2,
+"4w" => DSUTILS_WEEK4,
+// Day
+"day" => DSUTILS_DAY1,
+"1d" => DSUTILS_DAY1,
+"2d" => DSUTILS_DAY2,
+"3d" => DSUTILS_DAY4,
+// Year
+"year" => DSUTILS_YEAR1,
+"1y" => DSUTILS_YEAR1,
+"2y" => DSUTILS_YEAR2,
+"3y" => DSUTILS_YEAR5
+);
+
 // Main class
 abstract class JpchartMW {
   var $size;
@@ -140,6 +207,8 @@ abstract class JpchartMW {
   var $rotateylegend;
   var $xlabel;
   var $ylabel;
+  var $xlabelformat;
+  var $ylabelformat;
   var $haslegend;
   var $hasxgrid;
   var $hasygrid;
@@ -160,6 +229,8 @@ abstract class JpchartMW {
   var $labels;
   var $plot_list;
   var $islinear;
+  var $timealign;
+  var $tickalign;
   // Constructor
   function JpchartMW($args, $default_type) {
     global $jpgraphWikiDefaults;
@@ -177,6 +248,8 @@ abstract class JpchartMW {
     $this->fieldsep = ",";
     $this->xlabel = false;
     $this->ylabel = false;
+    $this->xlabelformat = false;
+    $this->ylabelformat = false;
     $this->scale = false;
     $this->dateformat = false;
     $this->haslegend = false;
@@ -212,6 +285,8 @@ abstract class JpchartMW {
     $this->plot_list = array();
     $this->xistime = false;
     $this->islinear = false;
+    $this->timealign = false;
+    $this->tickalign = false;
   }
   // debug function
   function debug($args) {
@@ -226,13 +301,15 @@ abstract class JpchartMW {
   function parseArgs($args) {
     global $jpgraphFontList;
     if(is_null($args)) return;
-    foreach( $args as $name => $value ) {
+    foreach($args as $name => $value) {
       if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|group|fill|dateformat|scale|format|fieldsep|".
+                               "max|min|timealign|tickalign|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|group|fill|dateformat|scale|format|fieldsep|max|min|ysteps)$/", $name, $field)) {
+                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|group|fill|dateformat|scale|format|fieldsep|".
+                               "max|min|timealign|tickalign|ysteps)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
       } else if(preg_match("/^(no)?(legend|)$/", $name, $field)) {
@@ -251,35 +328,40 @@ abstract class JpchartMW {
         }
       } else if(preg_match("/^(linemark|mark)$/", $name)) {
         $this->mark = $value;
-      } else switch($name) {
-        case "grid":
-          switch($value) {
-            case "xy":
-              $this->hasxgrid=true;
-              $this->hasygrid=true;
-              break;
-            case "yx":
-              $this->hasxgrid=true;
-              $this->hasygrid=true;
-              break;
-            case "x":
-              $this->hasxgrid=true;
-              $this->hasygrid=false;
-              break;
-            case "y":
-              $this->hasxgrid=false;
-              $this->hasygrid=true;
-              break;
-          }
-          break;
-        case "nogrid":
-          $this->hasxgrid=false;
-          $this->hasygrid=false;
-          break;
+      } else {
+        switch($name) {
+          case "grid":
+            switch($value) {
+              case "xy":
+                $this->hasxgrid=true;
+                $this->hasygrid=true;
+                break;
+              case "yx":
+                $this->hasxgrid=true;
+                $this->hasygrid=true;
+                break;
+              case "x":
+                $this->hasxgrid=true;
+                $this->hasygrid=false;
+                break;
+              case "y":
+                $this->hasxgrid=false;
+                $this->hasygrid=true;
+                break;
+            }
+            break;
+          case "nogrid":
+            $this->hasxgrid=false;
+            $this->hasygrid=false;
+            break;
+          default:
+            throw new Exception("Unknown option '$name'.");
+        }
       }
     }
   }
   function preProcess() {
+    global $jpgraphTimeAlign, $jpgraphTickAlign;
     $this->color_list = split(",", $this->colors);
     for($i = 0; $i < count($this->color_list); $i++) {
       // add a '#' if the user use an hexa color
@@ -312,12 +394,28 @@ abstract class JpchartMW {
       $this->graph->SetScale("textlin");
       $this->islinear = false;
     }
+    // Setting and checking time value
+    if($this->timealign) {
+      if(!preg_match("/,/", $this->timealign)) {
+        $this->timealign .= ",".$this->timealign;
+      }
+      $timealign = split(",", $this->timealign);
+      for($i = 0; $i < count($timealign); $i++)
+        if($timealign[$i] && !array_key_exists($timealign[$i], $jpgraphTimeAlign))
+          throw new Exception("Unknown time align value (".$timealign[$i]."). Possible values are: ".
+                              implode(", ", array_keys($jpgraphTimeAlign)));
+    }
+    if($this->tickalign && !array_key_exists($this->tickalign, $jpgraphTickAlign)) {
+       throw new Exception("Unknown tick align value (".$this->tickalign."). Possible values are: ".
+                            implode(", ", array_keys($jpgraphTickAlign)));
+    }
   }
   abstract function instanciateGraph();
   // part to implement in order to handle bar, line, pie etc.
   abstract function parse($input, $parser);
   // post process
   function postProcess() {
+    global $jpgraphTimeAlign, $jpgraphTickAlign, $dateUtils;
     $this->color_list = split(",", $this->colors);
 
     if($this->hasxgrid)
@@ -328,6 +426,10 @@ abstract class JpchartMW {
       $this->graph->xaxis->title->Set($this->xlabel);
     if($this->ylabel)
       $this->graph->yaxis->title->Set($this->ylabel);
+    if($this->xlabelformat)
+      $this->graph->xaxis->SetLabelFormatString($this->xlabelformat, $this->xistime);
+    if($this->ylabelformat)
+      $this->graph->yaxis->SetLabelFormatString($this->ylabelformat);
     $this->graph->ygrid->SetFill(true, '#EFEFEF@0.5', '#BBCCFF@0.5');
     if($this->dateformat)
       $this->graph->xaxis->scale->SetDateFormat($this->dateformat);
@@ -348,6 +450,15 @@ abstract class JpchartMW {
 
     $this->graph->yaxis->scale->SetAutoMin($this->min);
     $this->graph->yaxis->scale->SetAutoMax($this->max);
+    if($this->timealign) {
+      $timealign = split(",", $this->timealign);
+      $this->graph->xaxis->scale->SetDateAlign($jpgraphTimeAlign[$timealign[0]], $jpgraphTimeAlign[$timealign[1]]);
+    }
+    if($this->tickalign) {
+      $dateUtils = new DateScaleUtils();
+      list($tickPos,$minTickPos) = $dateUtils->getTicks($this->datax, $jpgraphTickAlign[$this->tickalign]);
+      $this->graph->xaxis->SetTickPositions($tickPos, $minTickPos);
+    }
   }
   // render and send back img tag
   function finalize($input, $args) {
