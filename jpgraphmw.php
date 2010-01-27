@@ -680,7 +680,7 @@ class JpchartMWLine extends JpchartMW {
 
 class JpchartMWPie extends JpchartMW {
   function JpchartMWPie($args) {
-    JpchartMW::JpchartMW($args);
+    JpchartMW::JpchartMW($args, "pie");
   }
   function instanciateGraph() {
     $this->graph = new PieGraph($this->size_x, $this->size_y);
