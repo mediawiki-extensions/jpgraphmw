@@ -185,6 +185,13 @@ $jpgraphTickAlign = array (
 "3y" => DSUTILS_YEAR5
 );
 
+$jpgraphLabelType = array (
+// Pie label type
+"ABS"     => PIE_VALUE_ABS,
+"PER"     => PIE_VALUE_PER,
+"ADJ_PER" => PIE_VALUE_ADJPER
+);
+
 // -----------------------------------------------------------------------------
 
 $jpgraph_help = "
@@ -226,8 +233,9 @@ acier,47
   margin             set margin value (ex : 10,0,10,0)
   xlabel             set xlabel
   ylabel             set ylabel
-  xlabelformat       set label format
-  ylabelformat
+  labelformat        set pie label format
+  xlabelformat       same for x label
+  ylabelformat       same for y label
   fill               set fill value for background
   dateformat         set date format
   scale              scale value. Possible value are: (dat|lin|text|log|int)(lin|log|int)
@@ -284,8 +292,11 @@ abstract class JpchartMW {
   var $rotateylegend;
   var $xlabel;
   var $ylabel;
+  var $showlabel;
+  var $labelformat;
   var $xlabelformat;
   var $ylabelformat;
+  var $labeltype;
   var $haslegend;
   var $hasxgrid;
   var $hasygrid;
@@ -324,8 +335,11 @@ abstract class JpchartMW {
     $this->fieldsep = ",";
     $this->xlabel = false;
     $this->ylabel = false;
+    $this->showlabel = true;
+    $this->labelformat = false;
     $this->xlabelformat = false;
     $this->ylabelformat = false;
+    $this->labeltype = "PER";
     $this->scale = false;
     $this->dateformat = false;
     $this->haslegend = false;
@@ -382,12 +396,12 @@ abstract class JpchartMW {
       if(preg_match("/help/", $name)) {
         throw new JpgraphMWException("");
       } else if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|center|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "explode|center|margin|xlabel|ylabel|showlabel|labelformat|xlabelformat|ylabelformat|labeltype|fill|dateformat|scale|format|fieldsep|".
                                "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|center|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "explode|center|margin|xlabel|ylabel|showlabel|labelformat|xlabelformat|ylabelformat|labeltype|fill|dateformat|scale|format|fieldsep|".
                                "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
@@ -689,6 +703,7 @@ class JpchartMWPie extends JpchartMW {
     $this->graph = new PieGraph($this->size_x, $this->size_y);
   }
   function parse($input, $parser) {
+    global $jpgraphLabelType;
     foreach(split("\n", $input) as $line) {
       // skip empty line or comments
       if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
@@ -715,6 +730,19 @@ class JpchartMWPie extends JpchartMW {
         $pie->SetCenter($tmp[0]);
       }
     }
+    if($this->labeltype) {
+      $label_type = $jpgraphLabelType[$this->labeltype];
+      if(!$label_type) {
+        throw new JpgraphMWException("Unknown label type(".$this->labeltype."). Possible values are: ".implode(", ", array_keys($jpgraphLabelType)));
+      }
+      $pie->SetLabelType($label_type);
+    }
+    if($this->labelformat) {
+      $pie->value->SetFormat($this->labelformat);
+    }
+    if($this->usettf)
+      $pie->value->SetFont($this->font);
+    $pie->value->Show($this->showlabel);
     $explode_pie_list = split(",", $this->explode);
     if(count($explode_pie_list) == 1) {
       $pie->ExplodeAll($explode_pie_list[0]);
