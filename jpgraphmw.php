@@ -217,6 +217,7 @@ acier,47
   rotateylegend      same as above
   usettf             use ttf to render text. Use value no to disable ttf rendering
   legendposition     set legend position
+  center             set pie position (ex : 0.4,0.6)
   barwidth           value of bar width
   title              title of this chart
   colors             use colors to render graphics (use ',' to use multiple colors).
@@ -277,6 +278,7 @@ abstract class JpchartMW {
   var $scale;
   var $dateformat;
   var $legendposition;
+  var $center;
   var $barwidth;
   var $rotatexlegend;
   var $rotateylegend;
@@ -330,6 +332,7 @@ abstract class JpchartMW {
     $this->hasxgrid = false;
     $this->hasygrid = false;
     $this->legendposition = false;
+    $this->center = "0.5,0.5";
     $this->barwidth = 0.5;
     $this->ishorizontal = false;
     $this->isantialias = true;   // use $jpgraphWikiDefaults = Array("antialias" => "no"); to disable antialias
@@ -379,12 +382,12 @@ abstract class JpchartMW {
       if(preg_match("/help/", $name)) {
         throw new JpgraphMWException("");
       } else if(preg_match("/^(no|not)(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "explode|center|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
                                "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[2].' = false;';
         eval($var);
       } else if(preg_match( "/^(size|type|rotatexlegend|usettf|rotateylegend|legendposition|barwidth|title|colors|nocolors|disable|".
-                               "explode|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
+                               "explode|center|margin|xlabel|ylabel|xlabelformat|ylabelformat|fill|dateformat|scale|format|fieldsep|".
                                "max|min|timealign|tickalign)$/", $name, $field)) {
         $var = "\$this->".$field[1].' = ($value == "no" ? "" : $value);';
         eval($var);
@@ -703,6 +706,14 @@ class JpchartMWPie extends JpchartMW {
       $pie->SetAngle($this->angle);
     } else {
       $pie = new PiePlot($this->datay);
+    }
+    if($this->center) {
+      $tmp = split(",", $this->center);
+      if(is_array($tmp) && count($tmp) == 2) {
+        $pie->SetCenter($tmp[0], $tmp[1]);
+      } else if(is_array($tmp) && count($tmp) == 1) {
+        $pie->SetCenter($tmp[0]);
+      }
     }
     $explode_pie_list = split(",", $this->explode);
     if(count($explode_pie_list) == 1) {
