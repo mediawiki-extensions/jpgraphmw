@@ -27,6 +27,7 @@ require_once("$jpgraph_home/src/jpgraph_date.php");
 require_once("$jpgraph_home/src/jpgraph_pie.php");
 require_once("$jpgraph_home/src/jpgraph_pie3d.php");
 require_once("$jpgraph_home/src/jpgraph_utils.inc.php");
+@require_once("$jpgraph_home/src/jpgraph_gantt.php");
 
 if(! defined( 'MEDIAWIKI' ) ) {
   echo( "This is an extension to the MediaWiki package and cannot be run standalone.\n" );
@@ -50,6 +51,7 @@ function jpChartSetup() {
   $wgParser->setHook('jpbars', 'jpBarsRender');
   $wgParser->setHook('jpbar', 'jpBarsRender');
   $wgParser->setHook('jppie', 'jpPieRender');
+  $wgParser->setHook('jpgantt', 'jpGanttRender');
 }
 
 $jpgraphMarkList = array(
@@ -453,6 +455,20 @@ abstract class JpchartMW {
       }
     }
   }
+  function applyScale() {
+    if($this->scale) {
+      if(preg_match("/^(dat|lin|text|log|int)(lin|log|int)$/", $this->scale, $tmp_scale)) {
+        $this->graph->SetScale($this->scale);
+        $this->islinear = preg_match("/^(lin|dat|log)$/", $tmp_scale[1]);
+        $this->xistime = preg_match("/^(dat)$/", $tmp_scale[1]);
+      } else {
+        throw new Exception("Error while parsing scale type. Unknown type ".$this->scale.".");
+      }
+    } else {
+      $this->graph->SetScale("textlin");
+      $this->islinear = false;
+    }
+  }
   function preProcess() {
     global $jpgraphTimeAlign, $jpgraphTickAlign;
     $this->color_list = split(",", $this->colors);
@@ -461,7 +477,6 @@ abstract class JpchartMW {
       if(preg_match("/^[a-fA-F0-9]{6}/", $this->color_list[$i]))
         $this->color_list[$i] = "#".$this->color_list[$i];
     }
-
     list($this->size_x, $this->size_y) = split("x", $this->size);
     $this->instanciateGraph();
     if($this->title) {
@@ -475,18 +490,7 @@ abstract class JpchartMW {
       list($lm, $rm, $tm, $bm) = split(",", $this->margin);
       $this->graph->SetMargin($lm, $rm, $tm, $bm);
     }
-    if($this->scale) {
-      if(preg_match("/^(dat|lin|text|log|int)(lin|log|int)$/", $this->scale, $tmp_scale)) {
-        $this->graph->SetScale($this->scale);
-        $this->islinear = preg_match("/^(lin|dat|log)$/", $tmp_scale[1]);
-        $this->xistime = preg_match("/^(dat)$/", $tmp_scale[1]);
-      } else {
-        throw new JpgraphMWException("Error while parsing scale type. Unknown type ".$this->scale.".");
-      }
-    } else {
-      $this->graph->SetScale("textlin");
-      $this->islinear = false;
-    }
+    $this->applyScale();
     // Setting and checking time value
     if($this->timealign) {
       if(!preg_match("/,/", $this->timealign)) {
@@ -579,6 +583,11 @@ class JpchartMWLine extends JpchartMW {
     JpchartMW::JpchartMW($args, $type);
   }
   function instanciateGraph() {
+    if(!$this->size_x || !$this->size_y) {
+      $this->size = "400x300";
+      $this->size_x = 400;
+      $this->size_y = 300;
+    }
     $this->graph = new Graph($this->size_x, $this->size_y, "auto");
   }
   function parse($input, $parser) {
@@ -700,7 +709,11 @@ class JpchartMWPie extends JpchartMW {
     JpchartMW::JpchartMW($args, "pie");
   }
   function instanciateGraph() {
-    $this->graph = new PieGraph($this->size_x, $this->size_y);
+    if($this->size) {
+      $this->graph = new PieGraph($this->size_x, $this->size_y);
+    } else {
+      $this->graph = new PieGraph(400, 300);
+    }
   }
   function parse($input, $parser) {
     global $jpgraphLabelType;
@@ -756,6 +769,68 @@ class JpchartMWPie extends JpchartMW {
 }
 
 // -----------------------------------------------------------------------------
+class JpchartMWGantt extends JpchartMW {
+  var $min_date;
+  var $max_date;
+  function JpchartMWGantt($args) {
+    JpchartMW::JpchartMW($args, "gantt");
+    $this->min_date = false;
+    $this->max_date = false;
+  }
+  function instanciateGraph() {
+    if($this->size_x && $this->size_y) {
+      $this->graph = new GanttGraph($this->size_x, $this->size_y);
+    } else if($this->size_x) {
+      $this->graph = new GanttGraph($this->size_x);
+    } else {
+      $this->graph = new GanttGraph();
+    }
+  }
+  function applyScale() {}
+  function postProcess() {
+    $this->graph->title->Set($this->title);
+    $this->graph->ShowHeaders(GANTT_HDAY | GANTT_HMONTH | GANTT_HYEAR);
+    $this->graph->SetDateRange($this->min_date, $this->max_date);
+  }
+  function parse($input, $parser) {
+    foreach(split("\n", $input) as $line) {
+      // skip empty line or comments
+      if(preg_match("/^(\s*)#.*$|^(\s*)$/", $line)) continue;
+      #               1ID>, 2P%,   3DEP,   4TASKNAME ,5DATE>,  6DATE,       7Tag
+      if(preg_match("/(\d+),(\d+)%,([\d:]*),([^,]+),([\d\s\-]+),([\d\s\-]+),?([^,]+)?/", $line, $parse_result)) {
+        # $bar = new GanttBar(ID,             Comment,          start,            end,            tag, height);
+        $bar = new GanttBar($parse_result[1], $parse_result[4], $parse_result[5], $parse_result[6]);
+        foreach(split(",", $parse_result[3]) as $dep) {
+          if(!$dep) continue;
+          $bar->SetConstrain($dep, CONSTRAIN_STARTEND);
+        }
+        if($this->min_date) {
+          if(strtotime($parse_result[5]) < strtotime($this->min_date)) {
+            $this->min_date = $parse_result[5];
+          }
+        } else {
+          $this->min_date = $parse_result[5];
+        }
+        if($this->max_date) {
+          if(strtotime($parse_result[6]) > strtotime($this->max_date)) {
+            $this->max_date = $parse_result[6];
+          }
+        } else {
+          $this->max_date = $parse_result[6];
+        }
+        $bar->SetPattern(BAND_RDIAG, "yellow");
+        $bar->SetFillColor("gray");
+        //$bar->progress->Set($parse_result[2]/100);
+        $bar->progress->SetPattern(GANTT_SOLID,"darkgreen");
+        $this->graph->Add($bar);
+      } else {
+        throw new Exception("Error while parsing line '$line': expected 'ID,PURCENT%,DEPENDENCY,TASK NAME,DATE,DATE'");
+      }
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
 function jpLinesRender($input, $args, $parser) {
   try {
     $jpchart = new JpchartMWLine($args);
@@ -781,6 +856,17 @@ function jpBarsRender($input, $args, $parser) {
 function jpPieRender($input, $args, $parser) {
   try {
     $jpchart = new JpchartMWPie($args);
+    $jpchart->parse($input, $parser);
+    $jpchart->postProcess();
+    return $jpchart->finalize($input, $args);
+  } catch(Exception $e) {
+    return "<div style=\"border: 1px solid red; padding: 0.5em;\">".$e->getMessage()."</div>";
+  }
+}
+
+function jpGanttRender($input, $args, $parser) {
+  try {
+    $jpchart = new JpchartMWGantt($args);
     $jpchart->parse($input, $parser);
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
