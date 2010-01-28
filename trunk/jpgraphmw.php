@@ -763,7 +763,7 @@ function jpLinesRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return $e->getMessage();
+    return "<div style=\"border: 1px solid red; padding: 0.5em;\">".$e->getMessage()."</div>";
   }
 }
 
@@ -774,7 +774,7 @@ function jpBarsRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return $e->getMessage();
+    return "<div style=\"border: 1px solid red; padding: 0.5em;\">".$e->getMessage()."</div>";
   }
 }
 
@@ -785,7 +785,7 @@ function jpPieRender($input, $args, $parser) {
     $jpchart->postProcess();
     return $jpchart->finalize($input, $args);
   } catch(Exception $e) {
-    return $e->getMessage();
+    return "<div style=\"border: 1px solid red; padding: 0.5em;\">".$e->getMessage()."</div>";
   }
 }
 
